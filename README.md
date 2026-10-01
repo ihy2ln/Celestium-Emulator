@@ -1,11 +1,28 @@
 # Celestium Emulator
 
-Android builds of **Adams Haven Tower**.
+A lightweight Windows launcher for the official Android Emulator — a replacement for MuMu Player. Run multiple Android instances, install APKs by drag-and-drop, and open logcat/adb shell in one click.
 
-## Install on your phone
-1. Open the [latest release](../../releases/latest) on your phone.
-2. Under **Assets**, tap the `.apk` file to download it (about 1 GB).
-3. Open the downloaded file. If Android asks, allow your browser to **install unknown apps**.
-4. Each new version installs over the old one and keeps your saves.
+## Features
+- One card per Android Virtual Device (AVD) with **Start / Stop** and live status (stopped → booting → running)
+- **Install APK…** button, or drag `.apk` files onto the window
+- **More ▾**: cold boot, writable-system boot (root/remount), logcat, adb shell, wipe data, open instance folder
 
-Requires an ARM64 Android phone.
+## Requirements
+- Windows 10/11 with **Windows Hypervisor Platform** enabled
+- [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0)
+- Android SDK with `emulator`, `platform-tools`, and at least one AVD
+
+## Setup
+1. Install the Android SDK command-line tools, then:
+   ```
+   sdkmanager "emulator" "platform-tools" "system-images;android-35;google_apis_playstore;x86_64"
+   avdmanager create avd -n Games -k "system-images;android-35;google_apis_playstore;x86_64" -d pixel_7
+   ```
+2. Download `CelestiumEmulator.zip` from the [latest release](../../releases/latest) and unzip it.
+3. Edit `launcher.json` so `SdkRoot` points at your Android SDK folder.
+4. Run `DroidLauncher.exe`.
+
+## Build from source
+```
+dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist
+```
