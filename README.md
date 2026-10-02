@@ -3,7 +3,7 @@
 A lightweight Windows launcher for the official Android Emulator — a replacement for MuMu Player. Run multiple Android instances, install APKs by drag-and-drop, and open logcat/adb shell in one click.
 
 ## Features
-- **Modern design:** a device sidebar with live screen thumbnails, a detail panel with Overview, Controls, Snapshots and Settings tabs, and light and dark themes that follow Windows. Shortcuts: Ctrl+1–6 switch tabs, Ctrl+N creates a device, Ctrl+S takes a screenshot, F5 refreshes.
+- **Modern design:** a device sidebar with live screen thumbnails, a detail panel with Overview, Controls, Snapshots and Settings tabs, and light and dark themes that follow Windows. Shortcuts: Ctrl+1–6 switch tabs, Ctrl+N creates a device, Ctrl+G opens game mode, Ctrl+S takes a screenshot, F5 refreshes.
 - **Resize from any edge:** drag any side of an emulator window and it scales with the correct proportions. Normally the emulator only resizes from its corners.
 - **Device profiles:** Phone, Phone Plus, Phone Ultra (QHD+), Compact, Foldable (with fold/unfold) and Tablet.
 - **Performance presets:** Low, Balanced, High and Ultra set RAM and CPU cores. Live CPU and RAM usage for each device.
@@ -16,6 +16,11 @@ A lightweight Windows launcher for the official Android Emulator — a replaceme
 - **Built-in auto-update:** checks GitHub twice a day, installs in place, and restarts. Updates only change the .dll files, so antivirus stays quiet. You can also check from the tray with **Check for updates**.
 - **Camera and microphone:** each camera can be a virtual scene, your PC webcam, or off, and you can use your PC microphone.
 - **Files:** drag APKs to install them, or drag any other file to send it to the phone's Downloads folder.
+- **Game mode (keymapping):** a see-through layer over the phone turns keys, mouse and an Xbox-style controller into multi-touch. Map buttons, a WASD/left-stick movement joystick, and a right-stick camera, with turbo buttons and on-screen key hints. Each game gets its own key map automatically, with a default map for the rest. Keys that aren't mapped still type. Open it with 🎮 on Overview, from the tray, or with Ctrl+G.
+- **Macros:** record what you do in game mode and play it back once or on a loop (right-click ▶).
+- **Multi-device sync:** mirror every touch and keystroke from one device to all other running devices.
+- **Fleet tools** (⋯ menu): start all, stop all, arrange all device windows in a grid, and keep any device always on top.
+- **App settings:** theme, start with Windows (hidden in the tray), reopen devices, and the screenshot/recording folder. Also an HTTP proxy per device (Controls › Network).
 - **Many devices at once,** each with a project label and a fixed adb serial. Multiple app windows.
 - **Background mode** (no window) and memory caps for devices that tools drive.
 - **Closes to the system tray** and remembers its state, including which devices were running.

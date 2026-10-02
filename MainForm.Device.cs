@@ -247,11 +247,16 @@ partial class MainForm
 
         var quick = NewCard("Quick actions", 0, 150, wide: true);
         var qf = Flow(quick);
+        var game = Action(qf, _games.ContainsKey(v.Avd) ? "🎮  Game mode (on)" : "🎮  Game mode", () => { StartGame(v.Avd); return Task.CompletedTask; }, PillStyle.Primary);
+        if (v.Info.Headless) { game.Enabled = false; _tips.SetToolTip(game, "Game mode needs the device's window — turn off background mode."); }
+        else _tips.SetToolTip(game, "Keys, mouse and gamepad → touch. Ctrl+G");
         Action(qf, "📷  Screenshot", () => TakeScreenshot(v.Avd));
         _recButton = Action(qf, _recording.Contains(v.Avd) ? "■  Stop recording" : "⏺  Record screen", () => ToggleRecording(v.Avd),
             _recording.Contains(v.Avd) ? PillStyle.Danger : PillStyle.Secondary);
         Action(qf, "Install APK…", () => PickAndInstall(v.Avd));
         Action(qf, "Send files…", () => PickAndSendFiles(v.Avd));
+        if (!v.Info.Headless)
+            Action(qf, _onTop.Contains(v.Avd) ? "📌  On top (on)" : "📌  Always on top", () => { ToggleOnTop(v.Avd); return Task.CompletedTask; });
         Action(qf, "Logcat", () => { WithSerial(v.Avd, _sdk.Logcat); return Task.CompletedTask; });
         Action(qf, "adb shell", () => { WithSerial(v.Avd, _sdk.OpenShell); return Task.CompletedTask; });
         Action(qf, "Media folder", () => { Directory.CreateDirectory(MediaFolder); Sdk.Launch("explorer.exe", $"\"{MediaFolder}\""); return Task.CompletedTask; }, needsRunning: false);
@@ -371,7 +376,7 @@ partial class MainForm
         };
         bf2.Controls.Add(Line("Charging", _chargingToggle, 318));
 
-        var net = NewCard("Network", Half, 200);
+        var net = NewCard("Network", Half, 300);
         var nf = Flow(net);
         var speed = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, Width = 160, Font = Theme.Body };
         var speeds = new[] { ("5G / unlimited", "full"), ("LTE", "lte"), ("3G", "umts"), ("EDGE", "edge"), ("GPRS", "gprs") };
@@ -385,6 +390,16 @@ partial class MainForm
         _airplaneToggle = new Toggle();
         _airplaneToggle.Toggled += async (_, _) => await _sdk.ShellCmd(serial, $"cmd connectivity airplane-mode {(_airplaneToggle.On ? "enable" : "disable")}");
         nf.Controls.Add(Line("Airplane mode", _airplaneToggle, 318));
+        var proxy = new TextBox { Width = 150, PlaceholderText = "host:port", BorderStyle = BorderStyle.FixedSingle, Font = Theme.Body };
+        nf.Controls.Add(Line("HTTP proxy", proxy, 318));
+        Action(nf, "Set proxy", async () =>
+        {
+            var value = proxy.Text.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"^[\w.-]+:\d{1,5}$")) throw new InvalidOperationException("Enter the proxy as host:port, e.g. 10.0.2.2:8888 (10.0.2.2 is your PC).");
+            await _sdk.ShellCmd(serial, $"settings put global http_proxy {value}");
+            SetStatus($"{v.Avd} now uses proxy {value}.");
+        });
+        Action(nf, "Clear proxy", async () => { await _sdk.ShellCmd(serial, "settings put global http_proxy :0"); proxy.Text = ""; SetStatus($"{v.Avd}: proxy cleared."); });
 
         var display = NewCard("Display & system", Half, 200);
         var df = Flow(display);
@@ -771,6 +786,28 @@ partial class MainForm
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+
+    // ── Game mode ───────────────────────────────────────────────────────────
+
+    readonly Dictionary<string, GameSession> _games = new();
+
+    void StartGame(string avd)
+    {
+        if (!_views.TryGetValue(avd, out var v) || !v.Running || v.Serial == null) { SetStatus("Start the device first."); return; }
+        if (v.Info.Headless) { SetStatus("Game mode needs the device's window. Turn off background mode in Settings."); return; }
+        ShowEmulatorWindow(avd);
+        if (_games.TryGetValue(avd, out var existing)) { SetStatus($"Game mode is already on for {avd}."); return; }
+        IntPtr hwnd = IntPtr.Zero;
+        if (Sdk.QemuPid(avd) is { } pid)
+            try { using var p = Process.GetProcessById(pid); hwnd = p.MainWindowHandle; } catch { }
+        if (hwnd == IntPtr.Zero) { SetStatus("Couldn't find the device's window."); return; }
+        var session = new GameSession(avd, v.Serial, hwnd, _sdk,
+            () => _views.Values.Where(o => o.Running && o.Avd != avd && o.Serial != null).Select(o => o.Serial!).ToList(), SetStatus);
+        session.Closed += () => { _games.Remove(avd); if (_selected == avd && _tabs.SelectedIndex == 0) BuildPage(); SetStatus($"Game mode off for {avd}."); };
+        _games[avd] = session;
+        SetStatus($"Game mode on for {avd}: click Edit keys on the bar above the phone to map keys and gamepad.");
+        if (_selected == avd && _tabs.SelectedIndex == 0) BuildPage();
+    }
 
     void ApplyPreset(string avd, PerfPreset preset)
     {

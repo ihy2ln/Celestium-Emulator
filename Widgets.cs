@@ -63,8 +63,9 @@ class PillButton : Control
         Width = Math.Max(44, TextRenderer.MeasureText(text, Font).Width + 32);
         Cursor = Cursors.Hand;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint |
-                 ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw, true);
+                 ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         BackColor = Color.Transparent;
+        TabStop = true;
     }
 
     protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -75,6 +76,16 @@ class PillButton : Control
     protected override void OnTextChanged(EventArgs e) { Invalidate(); base.OnTextChanged(e); }
 
     public void PerformClick() { if (Enabled) OnClick(EventArgs.Empty); }
+
+    // Keyboard: Tab to it, Space/Enter presses it, with a visible focus ring.
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        if (e.KeyCode is Keys.Space or Keys.Enter) { PerformClick(); e.Handled = true; }
+        base.OnKeyUp(e);
+    }
+    protected override bool IsInputKey(Keys keyData) => (keyData & Keys.KeyCode) is Keys.Space or Keys.Enter || base.IsInputKey(keyData);
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
 
     // Exposed as a real button to screen readers and UI automation.
     protected override AccessibleObject CreateAccessibilityInstance() => new ButtonAccessible(this);
@@ -108,6 +119,12 @@ class PillButton : Control
         using var path = Theme.Rounded(r, Height / 2);
         if (back.A > 0) using (var b = new SolidBrush(back)) g.FillPath(b, path);
         if (style == PillStyle.Secondary) using (var p = new Pen(t.Border)) g.DrawPath(p, path);
+        if (Focused && ShowFocusCues)
+        {
+            using var inner = Theme.Rounded(new Rectangle(2, 2, Width - 5, Height - 5), (Height - 4) / 2);
+            using var focus = new Pen(t.Accent, 2f);
+            g.DrawPath(focus, inner);
+        }
         TextRenderer.DrawText(g, Text, Font, r, fore, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 }

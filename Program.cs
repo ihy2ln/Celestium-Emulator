@@ -28,6 +28,10 @@ static class Program
         MainForm.StartSelect = Arg("--select");
         MainForm.ForceEdges = args.Contains("--force-edges"); // testing: edge resizing in an extra window
         MainForm.CheckUpdateOnStart = args.Contains("--check-update");
+        MainForm.GameOnStart = args.Contains("--game"); // open game mode for the --select'ed device
+        MainForm.SyncOnStart = args.Contains("--sync"); // with --game: turn sync on
+        MainForm.StartInTray = args.Contains("--tray"); // Windows startup: open hidden in the tray
+        MainForm.MacroSelfTest = args.Contains("--macro-selftest"); // with --game: record H, replay it, log to %TEMP%
         if (int.TryParse(Arg("--tab"), out var tab)) MainForm.StartTab = Math.Clamp(tab - 1, 0, 5);
 
         if (!primary && !forceNewWindow)

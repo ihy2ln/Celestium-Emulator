@@ -1,4 +1,4 @@
-<#
+﻿<#
   Builds Celestium Emulator and updates an installed copy in place.
 
   The .exe files are kept byte-identical between versions (see the csproj), so an update normally only
@@ -27,7 +27,7 @@ Remove-Item -Recurse -Force (Join-Path $src 'bin'), (Join-Path $src 'obj'), (Joi
 Push-Location $src
 try {
     foreach ($proj in 'CelestiumEmulator.csproj', 'cli\celestium.csproj') {
-        dotnet publish $proj -c Release -r win-x64 --self-contained false -o $dist -nologo -v q
+        dotnet publish $proj -c Release -r win-x64 --self-contained false -o $dist -nologo -v q --disable-build-servers
         if ($LASTEXITCODE -ne 0) { throw "Build failed: $proj" }
     }
 } finally { Pop-Location }

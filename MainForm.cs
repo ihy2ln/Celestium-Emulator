@@ -9,6 +9,10 @@ partial class MainForm : Form
     public static int StartTab;
     public static bool ForceEdges;
     public static bool CheckUpdateOnStart;
+    public static bool GameOnStart;
+    public static bool SyncOnStart;
+    public static bool StartInTray;
+    public static bool MacroSelfTest;
 
     readonly Sdk _sdk;
     readonly AppState _state;
@@ -128,6 +132,12 @@ partial class MainForm : Form
                 if (_state.LastUpdateCheck is not { } last || DateTime.UtcNow - last > TimeSpan.FromHours(12)) _ = CheckForUpdate(manual: false);
             }
             if (CheckUpdateOnStart) await CheckForUpdate(manual: true);
+            if (GameOnStart && _selected != null)
+            {
+                StartGame(_selected);
+                if (SyncOnStart && _games.TryGetValue(_selected, out var g)) g.ToggleSync();
+                if (MacroSelfTest && _games.TryGetValue(_selected, out var mg)) await mg.SelfTest(_sdk);
+            }
         };
         FormClosing += (_, e) =>
         {
@@ -149,6 +159,7 @@ partial class MainForm : Form
             if (e.Control && e.KeyCode is >= Keys.D1 and <= Keys.D6) { _tabs.Select(e.KeyCode - Keys.D1); e.Handled = true; }
             else if (e.Control && e.KeyCode == Keys.N) { e.Handled = true; await NewInstance(null); }
             else if (e.KeyCode == Keys.F5) { e.Handled = true; await Reload(); }
+            else if (e.Control && e.KeyCode == Keys.G && Selected is { Running: true } gs) { e.Handled = true; StartGame(gs.Avd); }
             else if (e.Control && e.KeyCode == Keys.S && Selected is { Running: true } s) { e.Handled = true; try { await TakeScreenshot(s.Avd); } catch (Exception ex) { SetStatus(ex.Message); } }
         };
     }
@@ -173,6 +184,9 @@ partial class MainForm : Form
             ApplyTheme();
             SetStatus($"Theme: {_state.Theme}.");
         };
+        var more = new PillButton("⋯", PillStyle.Ghost) { Width = 40, Margin = new Padding(0, 0, 4, 0) };
+        _tips.SetToolTip(more, "More: start/stop all, arrange windows, settings");
+        more.Click += (_, _) => ShowMoreMenu(more);
         var window = new PillButton("⧉", PillStyle.Ghost) { Width = 40, Margin = new Padding(0, 0, 8, 0) };
         _tips.SetToolTip(window, "Open another window");
         window.Click += (_, _) => OpenNewWindow();
@@ -181,7 +195,7 @@ partial class MainForm : Form
         var add = new PillButton("+  New device", PillStyle.Primary) { Margin = new Padding(0) };
         add.Click += async (_, _) => await NewInstance(null);
         _updateButton.Click += async (_, _) => await OfferUpdate(manual: true);
-        buttons.Controls.AddRange(new Control[] { _updateButton, theme, window, apk, add });
+        buttons.Controls.AddRange(new Control[] { _updateButton, more, theme, window, apk, add });
         _header.Controls.Add(buttons);
     }
 
@@ -238,7 +252,7 @@ partial class MainForm : Form
     protected override void SetVisibleCore(bool value)
     {
         // Launched with "start in tray": create the window but keep it hidden.
-        if (_primary && !IsHandleCreated && _state.StartHidden && value)
+        if (_primary && !IsHandleCreated && (_state.StartHidden || StartInTray) && value)
         {
             CreateHandle();
             value = false;
@@ -280,6 +294,10 @@ partial class MainForm : Form
                 item.DropDownItems.Add("Screenshot", null, async (_, _) => { try { await TakeScreenshot(avd); } catch (Exception ex) { SetStatus(ex.Message); } });
                 item.DropDownItems.Add(_recording.Contains(avd) ? "Stop recording" : "Record screen", null, async (_, _) => { try { await ToggleRecording(avd); } catch (Exception ex) { SetStatus(ex.Message); } });
                 item.DropDownItems.Add("Show window", null, (_, _) => ShowEmulatorWindow(avd));
+                item.DropDownItems.Add(_games.ContainsKey(avd) ? "Exit game mode" : "Game mode", null, (_, _) =>
+                {
+                    if (_games.TryGetValue(avd, out var g)) g.Dispose(); else StartGame(avd);
+                });
             }
             menu.Items.Add(item);
         }
@@ -409,6 +427,7 @@ partial class MainForm : Form
                 {
                     _booted.Remove(avd);
                     _recording.Remove(avd);
+                    if (_games.TryGetValue(avd, out var game)) game.Dispose();
                     // A start that never shows up in adb (bad args, port clash, crash) shouldn't stay "Starting…" forever.
                     if (_startingSince.TryGetValue(avd, out var since) && (DateTime.UtcNow - since).TotalSeconds > StartTimeoutSeconds)
                     {
