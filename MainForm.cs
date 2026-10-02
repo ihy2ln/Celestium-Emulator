@@ -8,6 +8,7 @@ partial class MainForm : Form
     public static string? StartSelect;
     public static int StartTab;
     public static bool ForceEdges;
+    public static bool CheckUpdateOnStart;
 
     readonly Sdk _sdk;
     readonly AppState _state;
@@ -25,6 +26,8 @@ partial class MainForm : Form
     readonly Label _status = new() { Dock = DockStyle.Bottom, Height = 30, Padding = new Padding(16, 0, 0, 0), TextAlign = ContentAlignment.MiddleLeft, Font = Theme.Small };
     readonly ToolTip _tips = new();
     readonly NotifyIcon _tray = new();
+    readonly PillButton _updateButton = new("⬆  Update", PillStyle.Success) { Visible = false, Margin = new Padding(0, 0, 8, 0) };
+    Updater.Release? _update;
 
     const int ActivePollMs = 3000, HiddenPollMs = 15000, StartTimeoutSeconds = 120;
     readonly System.Windows.Forms.Timer _poll = new() { Interval = ActivePollMs };
@@ -119,6 +122,12 @@ partial class MainForm : Form
             if (_loaded) return;
             await Reload();
             _poll.Start(); _live.Start();
+            if (_primary)
+            {
+                Updater.CleanupOldFiles();
+                if (_state.LastUpdateCheck is not { } last || DateTime.UtcNow - last > TimeSpan.FromHours(12)) _ = CheckForUpdate(manual: false);
+            }
+            if (CheckUpdateOnStart) await CheckForUpdate(manual: true);
         };
         FormClosing += (_, e) =>
         {
@@ -137,7 +146,7 @@ partial class MainForm : Form
         KeyPreview = true;
         KeyDown += async (_, e) =>
         {
-            if (e.Control && e.KeyCode is >= Keys.D1 and <= Keys.D4) { _tabs.Select(e.KeyCode - Keys.D1); e.Handled = true; }
+            if (e.Control && e.KeyCode is >= Keys.D1 and <= Keys.D6) { _tabs.Select(e.KeyCode - Keys.D1); e.Handled = true; }
             else if (e.Control && e.KeyCode == Keys.N) { e.Handled = true; await NewInstance(null); }
             else if (e.KeyCode == Keys.F5) { e.Handled = true; await Reload(); }
             else if (e.Control && e.KeyCode == Keys.S && Selected is { Running: true } s) { e.Handled = true; try { await TakeScreenshot(s.Avd); } catch (Exception ex) { SetStatus(ex.Message); } }
@@ -171,7 +180,8 @@ partial class MainForm : Form
         apk.Click += async (_, _) => { var t = await PickRunningDevice(); if (t != null) await PickAndInstall(t); };
         var add = new PillButton("+  New device", PillStyle.Primary) { Margin = new Padding(0) };
         add.Click += async (_, _) => await NewInstance(null);
-        buttons.Controls.AddRange(new Control[] { theme, window, apk, add });
+        _updateButton.Click += async (_, _) => await OfferUpdate(manual: true);
+        buttons.Controls.AddRange(new Control[] { _updateButton, theme, window, apk, add });
         _header.Controls.Add(buttons);
     }
 
@@ -280,6 +290,11 @@ partial class MainForm : Form
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Reopen running devices on launch", null, (_, _) => { _state.RestoreInstances = !_state.RestoreInstances; _state.Save(); }) { Checked = _state.RestoreInstances });
         menu.Items.Add(new ToolStripMenuItem("Start hidden in tray", null, (_, _) => { _state.StartHidden = !_state.StartHidden; _state.Save(); }) { Checked = _state.StartHidden });
+        menu.Items.Add(_update != null ? $"Install update {_update.Version}…" : "Check for updates…", null, async (_, _) =>
+        {
+            ShowFromTray();
+            if (_update != null) await OfferUpdate(manual: true); else await CheckForUpdate(manual: true);
+        });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => Quit());
     }
@@ -609,6 +624,52 @@ partial class MainForm : Form
         _selected = null;
         await Reload();
         SetStatus($"Deleted {avd}.");
+    }
+
+    // ── Updates ─────────────────────────────────────────────────────────────
+
+    async Task CheckForUpdate(bool manual)
+    {
+        try
+        {
+            if (manual) SetStatus("Checking for updates…");
+            _update = await Updater.CheckAsync();
+            _state.LastUpdateCheck = DateTime.UtcNow;
+            _state.Save();
+            _updateButton.Visible = _update != null;
+            if (_update != null)
+            {
+                _updateButton.Text = $"⬆  Update to {_update.Version}";
+                _updateButton.Width = TextRenderer.MeasureText(_updateButton.Text, _updateButton.Font).Width + 32;
+                SetStatus($"Celestium {_update.Version} is available. Click Update in the top bar.");
+                if (!manual && !Visible) _tray.ShowBalloonTip(4000, "Update available", $"Celestium {_update.Version} is ready to install.", ToolTipIcon.Info);
+                if (manual) await OfferUpdate(manual: true);
+            }
+            else if (manual) SetStatus($"You're up to date (Celestium {AppInfo.Version}).");
+        }
+        catch (Exception ex) { if (manual) SetStatus("Couldn't check for updates: " + ex.Message); }
+    }
+
+    async Task OfferUpdate(bool manual)
+    {
+        if (_update is not { } u) return;
+        var notes = u.Notes.Length > 900 ? u.Notes[..900] + "…" : u.Notes;
+        if (MessageBox.Show(this, $"Install Celestium {u.Version}? (You have {AppInfo.Version}.)\n\n{notes}\n\nThe app restarts afterwards; your Android devices keep running.",
+                "Update available", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
+        _updateButton.Enabled = false;
+        try
+        {
+            var exeChanged = await Updater.InstallAsync(u, new Progress<string>(SetStatus));
+            if (exeChanged)
+                MessageBox.Show(this, "This update includes a new .exe, so your antivirus may check it once on the next start.", "Update installed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Updater.RestartIntoNewVersion();
+            Quit();
+        }
+        catch (Exception ex)
+        {
+            _updateButton.Enabled = true;
+            MessageBox.Show(this, ex.Message, "Update failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     // ── Small dialogs ───────────────────────────────────────────────────────

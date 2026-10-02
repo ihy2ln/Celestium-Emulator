@@ -10,7 +10,7 @@ partial class MainForm
     readonly Label _dStatus = Ui.Text("", Theme.Body, sub: true);
     readonly PillButton _dStart = new("Start", PillStyle.Primary) { Width = 110 };
     readonly PillButton _dShow = new("Show window") { Width = 130 };
-    readonly TabStrip _tabs = new("Overview", "Controls", "Snapshots", "Settings");
+    readonly TabStrip _tabs = new("Overview", "Controls", "Apps", "Files", "Snapshots", "Settings");
     readonly FlowLayoutPanel _page = new()
     {
         Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true, FlowDirection = FlowDirection.LeftToRight,
@@ -98,15 +98,19 @@ partial class MainForm
             {
                 case 0: BuildOverview(v); break;
                 case 1: BuildControls(v); break;
-                case 2: BuildSnapshots(v); break;
-                case 3: BuildSettings(v); break;
+                case 2: BuildApps(v); break;
+                case 3: BuildFiles(v); break;
+                case 4: BuildSnapshots(v); break;
+                case 5: BuildSettings(v); break;
             }
         }
         _page.ResumeLayout();
         FitCards();
         Ui.Recolor(_page);
         if (v != null && _tabs.SelectedIndex == 0) _ = RefreshPreview();
-        if (v != null && _tabs.SelectedIndex == 2) _ = LoadSnapshots(v);
+        if (v != null && _tabs.SelectedIndex == 4) _ = LoadSnapshots(v);
+        if (v != null && _tabs.SelectedIndex == 2) _ = LoadApps(v);
+        if (v != null && _tabs.SelectedIndex == 3) _ = LoadFiles(v);
         if (v != null && _tabs.SelectedIndex == 1) _ = LoadControlStates(v);
     }
 
@@ -404,6 +408,8 @@ partial class MainForm
                 await _sdk.ShellCmd(serial, $"settings put global {key} {scale}");
         };
         df.Controls.Add(Line("Animations", animations, 318));
+
+        BuildHomeScreenCard(v);
 
         var sensors = NewCard("Sensors", Half, 150);
         var sf = Flow(sensors);

@@ -12,6 +12,13 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        // Restarting after a self-update: let the old copy exit first so this one becomes the primary.
+        var afterUpdate = Array.IndexOf(args, "--after-update");
+        if (afterUpdate >= 0 && afterUpdate + 1 < args.Length && int.TryParse(args[afterUpdate + 1], out var oldPid))
+        {
+            try { using var old = System.Diagnostics.Process.GetProcessById(oldPid); old.WaitForExit(15_000); } catch { }
+        }
+
         // The first copy is the "primary": it owns the tray icon, reopens last session's instances and
         // remembers the window position. More copies can be opened as ordinary extra windows.
         using var mutex = new Mutex(true, PrimaryMutexName, out bool primary);
@@ -20,7 +27,8 @@ static class Program
         string? Arg(string name) { var i = Array.IndexOf(args, name); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
         MainForm.StartSelect = Arg("--select");
         MainForm.ForceEdges = args.Contains("--force-edges"); // testing: edge resizing in an extra window
-        if (int.TryParse(Arg("--tab"), out var tab)) MainForm.StartTab = Math.Clamp(tab - 1, 0, 3);
+        MainForm.CheckUpdateOnStart = args.Contains("--check-update");
+        if (int.TryParse(Arg("--tab"), out var tab)) MainForm.StartTab = Math.Clamp(tab - 1, 0, 5);
 
         if (!primary && !forceNewWindow)
         {

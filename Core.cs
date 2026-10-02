@@ -8,7 +8,7 @@ namespace DroidLauncher;
 static class AppInfo
 {
     /// <summary>The real app version. The exe's file version stays 1.0.0 so the exe never changes (see the csproj).</summary>
-    public const string Version = "1.3.0";
+    public const string Version = "1.4.0";
 }
 
 record Config(string SdkRoot)
@@ -73,6 +73,7 @@ class AppState
     /// <summary>Where screenshots and recordings go; empty = Pictures\Celestium.</summary>
     public string? MediaFolder { get; set; }
     public string? SelectedAvd { get; set; }
+    public DateTime? LastUpdateCheck { get; set; }
 
     static string FilePath => Path.Combine(Paths.DataDir, "state.json");
     public static AppState Load() => Paths.ReadJson<AppState>(FilePath);
@@ -260,6 +261,17 @@ static class AvdFactory
             "path.rel=avd\\" + name + ".avd",
             target,
         });
+    }
+
+    /// <summary>Whether the AVD's system image includes the Google Play Store.</summary>
+    public static bool HasPlayStore(string name)
+    {
+        try
+        {
+            return File.ReadLines(Path.Combine(Paths.AvdHome, name + ".avd", "config.ini"))
+                .Any(l => l.Replace(" ", "").Equals("PlayStore.enabled=yes", StringComparison.OrdinalIgnoreCase));
+        }
+        catch { return false; }
     }
 
     /// <summary>The hw.ramSize from an AVD's config.ini, in MB (0 if unknown).</summary>

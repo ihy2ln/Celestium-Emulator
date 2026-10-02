@@ -3,13 +3,17 @@
 A lightweight Windows launcher for the official Android Emulator — a replacement for MuMu Player. Run multiple Android instances, install APKs by drag-and-drop, and open logcat/adb shell in one click.
 
 ## Features
-- **Modern design:** a device sidebar with live screen thumbnails, a detail panel with Overview, Controls, Snapshots and Settings tabs, and light and dark themes that follow Windows. Shortcuts: Ctrl+1–4 switch tabs, Ctrl+N creates a device, Ctrl+S takes a screenshot, F5 refreshes.
+- **Modern design:** a device sidebar with live screen thumbnails, a detail panel with Overview, Controls, Snapshots and Settings tabs, and light and dark themes that follow Windows. Shortcuts: Ctrl+1–6 switch tabs, Ctrl+N creates a device, Ctrl+S takes a screenshot, F5 refreshes.
 - **Resize from any edge:** drag any side of an emulator window and it scales with the correct proportions. Normally the emulator only resizes from its corners.
 - **Device profiles:** Phone, Phone Plus, Phone Ultra (QHD+), Compact, Foldable (with fold/unfold) and Tablet.
 - **Performance presets:** Low, Balanced, High and Ultra set RAM and CPU cores. Live CPU and RAM usage for each device.
 - **Phone controls:** Back, Home, Recents, Power, Volume, Rotate, GPS location (city presets or coordinates), battery level and charging, mobile data speed, Wi-Fi, airplane mode, dark theme, gesture navigation, animation speed, shake, and fingerprint touch.
 - **Screenshots and screen recording:** one click, from the app or the tray. Saved to Pictures\Celestium.
 - **Snapshots:** save a device's exact state and restore it in seconds.
+- **Apps manager:** search installed apps, then open, force-stop, show app info, save the APK to your PC, clear data, or uninstall.
+- **Files manager:** browse phone storage, upload files (or drag them onto the list), download to your PC, create folders, and delete.
+- **Home screen and style:** set a wallpaper from a PC image, change font and display size, and get a launcher with one click (Lawnchair, Nova, Niagara, Smart Launcher) on Play Store devices.
+- **Built-in auto-update:** checks GitHub twice a day, installs in place, and restarts. Updates only change the .dll files, so antivirus stays quiet. You can also check from the tray with **Check for updates**.
 - **Camera and microphone:** each camera can be a virtual scene, your PC webcam, or off, and you can use your PC microphone.
 - **Files:** drag APKs to install them, or drag any other file to send it to the phone's Downloads folder.
 - **Many devices at once,** each with a project label and a fixed adb serial. Multiple app windows.
