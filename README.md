@@ -20,7 +20,7 @@ A lightweight Windows launcher for the official Android Emulator — a replaceme
    ```
 2. Download `CelestiumEmulator.zip` from the [latest release](../../releases/latest) and unzip it.
 3. Edit `launcher.json` so `SdkRoot` points at your Android SDK folder.
-4. Run `DroidLauncher.exe`.
+4. Run `CelestiumEmulator.exe`.
 
 ## Build from source
 ```
