@@ -3,14 +3,18 @@
 A lightweight Windows launcher for the official Android Emulator — a replacement for MuMu Player. Run multiple Android instances, install APKs by drag-and-drop, and open logcat/adb shell in one click.
 
 ## Features
-- One card per Android Virtual Device (AVD) with **Start / Stop** and live status (stopped → booting → running)
-- **Install APK…** button, or drag `.apk` files onto the window
-- **More ▾**: cold boot, writable-system boot (root/remount), logcat, adb shell, wipe data, open instance folder
-- **Closes to the system tray**: the X button hides the window and the app keeps running. Click the tray icon to reopen it, or right-click it to start or stop instances or **Quit**. Launching the exe again brings back the existing window.
-- **Many devices at once**: **+ New** creates an instance with the same settings as an existing one. Each instance has a fixed adb serial (`emulator-<port>`) and an optional **project label**, so several projects can each have their own device without clashing.
-- **Memory control**: under More ▾ → Memory, cap each device's RAM (2–8 GB). **Run in background (no window)** saves more RAM and GPU for devices that tools drive. A 2 GB background device uses about 1.5 GB instead of about 5 GB.
-- **Multiple windows**: the ⧉ button, or opening the exe while it's already visible, opens another window.
-- **Remembers its state**: window size and position, your last APK folder, and which instances were running. Those instances reopen on the next launch, even after a reboot. You can turn this off from the tray menu. The state is saved in `%APPDATA%\CelestiumEmulator\state.json`.
+- **Modern design:** a device sidebar with live screen thumbnails, a detail panel with Overview, Controls, Snapshots and Settings tabs, and light and dark themes that follow Windows. Shortcuts: Ctrl+1–4 switch tabs, Ctrl+N creates a device, Ctrl+S takes a screenshot, F5 refreshes.
+- **Resize from any edge:** drag any side of an emulator window and it scales with the correct proportions. Normally the emulator only resizes from its corners.
+- **Device profiles:** Phone, Phone Plus, Phone Ultra (QHD+), Compact, Foldable (with fold/unfold) and Tablet.
+- **Performance presets:** Low, Balanced, High and Ultra set RAM and CPU cores. Live CPU and RAM usage for each device.
+- **Phone controls:** Back, Home, Recents, Power, Volume, Rotate, GPS location (city presets or coordinates), battery level and charging, mobile data speed, Wi-Fi, airplane mode, dark theme, gesture navigation, animation speed, shake, and fingerprint touch.
+- **Screenshots and screen recording:** one click, from the app or the tray. Saved to Pictures\Celestium.
+- **Snapshots:** save a device's exact state and restore it in seconds.
+- **Camera and microphone:** each camera can be a virtual scene, your PC webcam, or off, and you can use your PC microphone.
+- **Files:** drag APKs to install them, or drag any other file to send it to the phone's Downloads folder.
+- **Many devices at once,** each with a project label and a fixed adb serial. Multiple app windows.
+- **Background mode** (no window) and memory caps for devices that tools drive.
+- **Closes to the system tray** and remembers its state, including which devices were running.
 
 ## Requirements
 - Windows 10/11 with **Windows Hypervisor Platform** enabled

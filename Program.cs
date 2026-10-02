@@ -16,6 +16,11 @@ static class Program
         // remembers the window position. More copies can be opened as ordinary extra windows.
         using var mutex = new Mutex(true, PrimaryMutexName, out bool primary);
         bool forceNewWindow = args.Contains("--new-window");
+        // Optional: open straight to a device and tab, e.g. --select Dev --tab 2
+        string? Arg(string name) { var i = Array.IndexOf(args, name); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
+        MainForm.StartSelect = Arg("--select");
+        MainForm.ForceEdges = args.Contains("--force-edges"); // testing: edge resizing in an extra window
+        if (int.TryParse(Arg("--tab"), out var tab)) MainForm.StartTab = Math.Clamp(tab - 1, 0, 3);
 
         if (!primary && !forceNewWindow)
         {

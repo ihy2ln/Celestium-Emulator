@@ -8,7 +8,7 @@ namespace DroidLauncher;
 static class AppInfo
 {
     /// <summary>The real app version. The exe's file version stays 1.0.0 so the exe never changes (see the csproj).</summary>
-    public const string Version = "1.2.0";
+    public const string Version = "1.3.0";
 }
 
 record Config(string SdkRoot)
@@ -68,6 +68,11 @@ class AppState
     public bool TrayHintShown { get; set; }
     public string? LastApkFolder { get; set; }
     public List<string> RunningInstances { get; set; } = new();
+    /// <summary>"system", "light" or "dark".</summary>
+    public string Theme { get; set; } = "system";
+    /// <summary>Where screenshots and recordings go; empty = Pictures\Celestium.</summary>
+    public string? MediaFolder { get; set; }
+    public string? SelectedAvd { get; set; }
 
     static string FilePath => Path.Combine(Paths.DataDir, "state.json");
     public static AppState Load() => Paths.ReadJson<AppState>(FilePath);
@@ -85,6 +90,17 @@ class InstanceInfo
     public int? RamMb { get; set; }
     /// <summary>Run with -no-window: no screen, so less RAM and GPU. For devices that tools drive over adb.</summary>
     public bool Headless { get; set; }
+    /// <summary>Performance preset name (Low/Balanced/High/Ultra), or null if RAM/cores were set by hand.</summary>
+    public string? Preset { get; set; }
+    /// <summary>Virtual CPU cores (-cores); null = emulator default.</summary>
+    public int? Cores { get; set; }
+    /// <summary>"emulated" (virtual scene), "webcam0" (PC webcam) or "none".</summary>
+    public string? CameraBack { get; set; }
+    public string? CameraFront { get; set; }
+    /// <summary>Pass the PC microphone through (-allow-host-audio). Off by default for privacy.</summary>
+    public bool HostMic { get; set; }
+    /// <summary>Device profile it was created with, for display.</summary>
+    public string? Profile { get; set; }
 }
 
 /// <summary>
@@ -146,6 +162,14 @@ static class InstanceStore
         return 0;
     });
 
+    /// <summary>Change any settings of one instance atomically (other windows/CLI may be editing too).</summary>
+    public static void Edit(string avd, Action<InstanceInfo> change) => Update(all =>
+    {
+        if (!all.TryGetValue(avd, out var info)) all[avd] = info = new InstanceInfo();
+        change(info);
+        return 0;
+    });
+
     public static void SetHeadless(string avd, bool headless) => Update(all =>
     {
         if (!all.TryGetValue(avd, out var info)) all[avd] = info = new InstanceInfo();
@@ -171,6 +195,41 @@ static class InstanceStore
 static class AvdFactory
 {
     public static readonly Regex ValidName = new("^[A-Za-z0-9._-]{1,40}$");
+
+    /// <summary>Set (or add) key=value lines in an AVD's config.ini. Takes effect on the next cold boot.</summary>
+    public static void SetConfig(string name, IDictionary<string, string> values)
+    {
+        var path = Path.Combine(Paths.AvdHome, name + ".avd", "config.ini");
+        var lines = File.ReadAllLines(path).ToList();
+        foreach (var (key, value) in values)
+        {
+            var i = lines.FindIndex(l => l.Split('=', 2)[0].Trim().Equals(key, StringComparison.OrdinalIgnoreCase));
+            if (i >= 0) lines[i] = $"{key}={value}"; else lines.Add($"{key}={value}");
+        }
+        File.WriteAllLines(path, lines);
+    }
+
+    /// <summary>Give an AVD a device profile's screen. The old quick-boot snapshot no longer fits, so it cold boots once.</summary>
+    public static void ApplyProfile(string name, DeviceProfile profile)
+    {
+        SetConfig(name, new Dictionary<string, string>
+        {
+            ["hw.lcd.width"] = profile.Width.ToString(),
+            ["hw.lcd.height"] = profile.Height.ToString(),
+            ["hw.lcd.density"] = profile.Dpi.ToString(),
+            ["hw.sensor.hinge"] = profile.Foldable ? "yes" : "no",
+            ["showDeviceFrame"] = "no",
+        });
+        var snapshot = Path.Combine(Paths.AvdHome, name + ".avd", "snapshots", "default_boot");
+        try { if (Directory.Exists(snapshot)) Directory.Delete(snapshot, true); } catch { }
+        InstanceStore.Edit(name, i => i.Profile = profile.Name);
+    }
+
+    public static void CreateFrom(string template, string name, DeviceProfile? profile)
+    {
+        CreateFrom(template, name);
+        if (profile != null) ApplyProfile(name, profile);
+    }
 
     public static void CreateFrom(string template, string name)
     {
@@ -350,6 +409,10 @@ class Sdk(Config cfg)
         var args = $"-avd {avd} -port {port} -no-boot-anim";
         if (info.RamMb is > 0) args += $" -memory {info.RamMb}";
         if (info.Headless) args += " -no-window";
+        if (info.Cores is > 0) args += $" -cores {info.Cores}";
+        if (info.CameraBack is { Length: > 0 } back) args += $" -camera-back {back}";
+        if (info.CameraFront is { Length: > 0 } front) args += $" -camera-front {front}";
+        if (info.HostMic) args += " -allow-host-audio";
         Detached.Start(Emulator, $"{args} {extraArgs}".Trim());
         return "emulator-" + port;
     }
@@ -366,7 +429,52 @@ class Sdk(Config cfg)
         Run(Adb, $"-s {serial} install -r -g \"{apk}\"", 600_000);
 
     public void Logcat(string serial) => Launch("cmd.exe", $"/k title logcat {serial} && \"{Adb}\" -s {serial} logcat -v color");
-    public void Shell(string serial) => Launch("cmd.exe", $"/k title shell {serial} && \"{Adb}\" -s {serial} shell");
+    public void OpenShell(string serial) => Launch("cmd.exe", $"/k title shell {serial} && \"{Adb}\" -s {serial} shell");
+
+    /// <summary>Run a command in the device's shell and return its trimmed output.</summary>
+    public async Task<string> ShellCmd(string serial, string command, int timeoutMs = 15_000)
+    {
+        var (_, output) = await Run(Adb, $"-s {serial} shell {command}", timeoutMs);
+        return output.Trim();
+    }
+
+    public Task KeyEvent(string serial, int keycode) => ShellCmd(serial, $"input keyevent {keycode}");
+
+    /// <summary>PNG of the current screen, or null if the device isn't ready.</summary>
+    public async Task<byte[]?> Screencap(string serial)
+    {
+        var psi = new ProcessStartInfo(Adb, $"-s {serial} exec-out screencap -p")
+        {
+            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true,
+        };
+        using var p = Process.Start(psi)!;
+        using var ms = new MemoryStream();
+        var copy = p.StandardOutput.BaseStream.CopyToAsync(ms);
+        _ = p.StandardError.ReadToEndAsync();
+        using var cts = new CancellationTokenSource(10_000);
+        try { await p.WaitForExitAsync(cts.Token); await copy; }
+        catch (OperationCanceledException) { try { p.Kill(true); } catch { } return null; }
+        var bytes = ms.ToArray();
+        return bytes.Length > 8 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G' ? bytes : null;
+    }
+
+    public Task<(int, string)> Push(string serial, string localPath, string remoteDir) =>
+        Run(Adb, $"-s {serial} push \"{localPath}\" \"{remoteDir}\"", 600_000);
+
+    /// <summary>The emulator's VM process id, from the lock file it keeps in the AVD folder while running.</summary>
+    public static int? QemuPid(string avd)
+    {
+        try
+        {
+            var file = Path.Combine(Paths.AvdHome, avd + ".avd", "hardware-qemu.ini.lock", "pid");
+            if (!File.Exists(file)) return null;
+            // The emulator keeps this file open for writing, so it must be read with full sharing.
+            using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(fs);
+            return int.TryParse(reader.ReadToEnd().Trim(), out var pid) ? pid : null;
+        }
+        catch { return null; }
+    }
 
     /// <summary>Fire-and-forget launch that doesn't keep a Process handle alive.</summary>
     public static void Launch(string exe, string args)

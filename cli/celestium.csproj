@@ -29,5 +29,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../Core.cs" Link="Core.cs" />
+    <Compile Include="../Profiles.cs" Link="Profiles.cs" />
+    <Compile Include="../EmulatorConsole.cs" Link="EmulatorConsole.cs" />
   </ItemGroup>
 </Project>

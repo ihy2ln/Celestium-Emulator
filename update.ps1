@@ -25,10 +25,15 @@ if ($running) {
 
 # 2. Build.
 Remove-Item -Recurse -Force (Join-Path $src 'bin'), (Join-Path $src 'obj'), (Join-Path $src 'cli\bin'), (Join-Path $src 'cli\obj'), $dist -ErrorAction SilentlyContinue
-foreach ($proj in 'CelestiumEmulator.csproj', 'cli\celestium.csproj') {
-    dotnet publish (Join-Path $src $proj) -c Release -r win-x64 --self-contained false -o $dist -nologo -v q
-    if ($LASTEXITCODE -ne 0) { throw "Build failed: $proj" }
-}
+# Build from the source folder: global.json (which pins the SDK, and with it the exact .exe bytes) is only
+# honoured when it's in the current directory or one of its parents.
+Push-Location $src
+try {
+    foreach ($proj in 'CelestiumEmulator.csproj', 'cli\celestium.csproj') {
+        dotnet publish $proj -c Release -r win-x64 --self-contained false -o $dist -nologo -v q
+        if ($LASTEXITCODE -ne 0) { throw "Build failed: $proj" }
+    }
+} finally { Pop-Location }
 
 # 3. Compare the .exe files with the installed ones.
 New-Item -ItemType Directory -Force $InstallDir | Out-Null

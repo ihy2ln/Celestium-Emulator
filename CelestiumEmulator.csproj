@@ -32,6 +32,8 @@
 
     <!-- Smaller footprint: no ICU culture data, workstation non-concurrent GC (no background GC thread). -->
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Custom controls are built in code, not the WinForms designer. -->
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <TieredPGO>false</TieredPGO>
