@@ -1,20 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
+    <OutputType>Exe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>CelestiumEmulator</AssemblyName>
+    <AssemblyName>celestium</AssemblyName>
     <RootNamespace>DroidLauncher</RootNamespace>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <ApplicationIcon>app.ico</ApplicationIcon>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-
-    <!-- File properties shown in Explorer and read by antivirus reputation checks. -->
+    <ApplicationIcon>../app.ico</ApplicationIcon>
+    <ApplicationManifest>../app.manifest</ApplicationManifest>
     <Product>Celestium Emulator</Product>
-    <AssemblyTitle>Celestium Emulator</AssemblyTitle>
-    <Description>Launcher for the official Android Emulator</Description>
+    <AssemblyTitle>Celestium Emulator command line</AssemblyTitle>
+    <Description>Command-line control for Celestium Emulator instances</Description>
     <Company>ihy2ln</Company>
     <Authors>ihy2ln</Authors>
     <Copyright>Copyright © 2026 ihy2ln</Copyright>
@@ -27,18 +23,11 @@
     <Version>1.0.0</Version>
     <InformationalVersion>1.0.0</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <RepositoryUrl>https://github.com/ihy2ln/Celestium-Emulator</RepositoryUrl>
     <Deterministic>true</Deterministic>
-
-    <!-- Smaller footprint: no ICU culture data, workstation non-concurrent GC (no background GC thread). -->
     <InvariantGlobalization>true</InvariantGlobalization>
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
-    <ServerGarbageCollection>false</ServerGarbageCollection>
-    <TieredPGO>false</TieredPGO>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="cli/**" />
-    <None Remove="cli/**" />
-    <None Update="launcher.json" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../Core.cs" Link="Core.cs" />
   </ItemGroup>
 </Project>
