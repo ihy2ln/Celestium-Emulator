@@ -14,14 +14,11 @@ $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot
 $dist = Join-Path $src 'dist'
 
-# 1. Refuse to touch files that are in use. Ask instead of killing anything.
+# 1. Note whether the app is running. Its files are in use, so they get renamed aside (Windows allows that)
+#    instead of overwritten, and the new version loads the next time it starts.
 $running = Get-Process CelestiumEmulator, celestium -ErrorAction SilentlyContinue |
     Where-Object { $_.Path -and $_.Path.StartsWith($InstallDir, [StringComparison]::OrdinalIgnoreCase) }
-if ($running) {
-    Write-Host "Celestium Emulator is running from $InstallDir." -ForegroundColor Yellow
-    Write-Host "Right-click its tray icon and choose Quit (your Android instances keep running), then run this again."
-    exit 1
-}
+Get-ChildItem $InstallDir -Filter '*.old' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 
 # 2. Build.
 Remove-Item -Recurse -Force (Join-Path $src 'bin'), (Join-Path $src 'obj'), (Join-Path $src 'cli\bin'), (Join-Path $src 'cli\obj'), $dist -ErrorAction SilentlyContinue
@@ -44,14 +41,24 @@ foreach ($exe in 'CelestiumEmulator.exe', 'celestium.exe') {
 }
 
 # 4. Copy everything except debug symbols. Keep the user's launcher.json.
-Get-ChildItem $dist -File | Where-Object { $_.Extension -ne '.pdb' } | ForEach-Object {
-    $target = Join-Path $InstallDir $_.Name
-    if ($_.Name -eq 'launcher.json' -and (Test-Path $target)) { return }
-    Copy-Item $_.FullName $target -Force
+foreach ($file in Get-ChildItem $dist -File | Where-Object { $_.Extension -ne '.pdb' }) {
+    $target = Join-Path $InstallDir $file.Name
+    if ($file.Name -eq 'launcher.json' -and (Test-Path $target)) { continue }
+    if ((Test-Path $target) -and (Get-FileHash $target).Hash -eq (Get-FileHash $file.FullName).Hash) { continue } # unchanged
+    try { Copy-Item $file.FullName $target -Force -ErrorAction Stop }
+    catch {
+        # In use by the running app: move it aside and put the new file in its place.
+        Move-Item $target "$target.$([DateTime]::Now.Ticks).old" -Force
+        Copy-Item $file.FullName $target -Force
+    }
 }
+# Safety net: every file the app needs must be present before we report success.
+$missing = Get-ChildItem $dist -File | Where-Object { $_.Extension -ne '.pdb' -and -not (Test-Path (Join-Path $InstallDir $_.Name)) }
+if ($missing) { throw "Update incomplete, missing: $($missing.Name -join ', ')" }
 
 $version = (Select-String -Path (Join-Path $src 'Core.cs') -Pattern 'Version = "([^"]+)"').Matches[0].Groups[1].Value
 Write-Host "Updated $InstallDir to Celestium Emulator $version." -ForegroundColor Green
+if ($running) { Write-Host "Celestium is running: restart it (tray icon > Quit, then open it again) to load the new version." -ForegroundColor Yellow }
 if ($exeChanged) {
     Write-Host "Note: $($exeChanged -join ', ') changed, so Norton may check it once more." -ForegroundColor Yellow
 } else {
