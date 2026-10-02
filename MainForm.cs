@@ -159,7 +159,9 @@ partial class MainForm : Form
         if (_primary || ForceEdges)
         {
             _edges = new EdgeResizer();
-            _wheel = new WheelScroller(this, FingerModeWindows);
+            _wheel = new WheelScroller(this, FingerModeWindows, () => _state.PcBackButtons,
+                serial => KeyInjector.For(_sdk.Adb, serial).Press(4 /* KEYCODE_BACK */));
+            ApplyEmulatorKeyboardSetting();
         }
         KeyPreview = true;
         KeyDown += async (_, e) =>
@@ -537,6 +539,7 @@ partial class MainForm : Form
                 if (_recording.Contains(avd)) { try { await ToggleRecording(avd); } catch { } }
                 await _sdk.Stop(r.serial);
                 EmulatorConsole.Forget(r.serial);
+                KeyInjector.Forget(r.serial);
                 await Task.Delay(1500);
                 await RefreshAll();
                 SetStatus($"{avd} stopped.");

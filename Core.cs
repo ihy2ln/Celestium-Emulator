@@ -8,7 +8,7 @@ namespace DroidLauncher;
 static class AppInfo
 {
     /// <summary>The real app version. The exe's file version stays 1.0.0 so the exe never changes (see the csproj).</summary>
-    public const string Version = "1.6.1";
+    public const string Version = "1.6.2";
 }
 
 record Config(string SdkRoot)
@@ -74,6 +74,10 @@ class AppState
     public string? MediaFolder { get; set; }
     public string? SelectedAvd { get; set; }
     public DateTime? LastUpdateCheck { get; set; }
+    /// <summary>Right-click, the mouse's Back button and Esc act as Android Back on device windows.</summary>
+    public bool PcBackButtons { get; set; } = true;
+    /// <summary>Ctrl shortcuts (copy/paste, word jumps…) go to Android apps instead of the emulator's own controls.</summary>
+    public bool ShortcutsToApps { get; set; } = true;
 
     static string FilePath => Path.Combine(Paths.DataDir, "state.json");
     public static AppState Load() => Paths.ReadJson<AppState>(FilePath);

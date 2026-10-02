@@ -14,6 +14,8 @@ Celestium isn't code-signed, so antivirus that checks reputation may look at it 
 
 **Clicks don't open apps, dragging doesn't scroll, or the wheel acts like a click.** The device is using the emulator's desktop-mouse mode. In **Settings › Hardware**, make sure **Mouse as a desktop pointer** is off, press **Save hardware**, and restart the device. With it off, clicks are taps, drags are swipes, and the wheel scrolls smoothly.
 
+**Ctrl+C, Ctrl+V or Ctrl+arrow keys rotate the phone or do something else.** Turn on **⋯ › Settings › Ctrl shortcuts go to apps**, then restart the device so its window picks up the change.
+
 **The screen preview is black.** The device is still booting, or its screen is off. Press **Power** on the Controls tab.
 
 **Game mode doesn't react to keys.** Click the phone screen once so game mode has keyboard focus. Controller input only works while the game is in front.

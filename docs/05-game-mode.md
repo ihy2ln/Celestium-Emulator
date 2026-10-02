@@ -17,7 +17,7 @@ While game mode is on:
 
 - **Mapped keys** tap their spot on the screen. Holding the key holds your finger down.
 - **Unmapped keys** still work as a keyboard: letters type into text boxes, Enter, Backspace and the arrow keys work, and **Esc is Back**.
-- **The mouse** taps and drags like a finger.
+- **The mouse** taps and drags like a finger, the wheel scrolls, Shift+wheel scrolls sideways, and Ctrl+wheel pinches to zoom.
 
 ## Mapping keys
 

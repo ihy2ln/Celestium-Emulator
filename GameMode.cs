@@ -437,13 +437,19 @@ sealed class GameSession : IDisposable
     /// <summary>Keys that aren't mapped still work as a keyboard (typing in chat boxes, menus, sync typing).</summary>
     void ForwardUnmapped(Keys key)
     {
-        string? linux = key switch
+        // Android keycodes (console key events don't reach Android, so these go through a persistent adb shell).
+        int? android = key switch
         {
-            Keys.Enter => "KEY_ENTER", Keys.Back => "KEY_BACKSPACE", Keys.Escape => "KEY_BACK", Keys.Tab => "KEY_TAB",
-            Keys.Up => "KEY_UP", Keys.Down => "KEY_DOWN", Keys.Left => "KEY_LEFT", Keys.Right => "KEY_RIGHT", Keys.Delete => "KEY_DELETE",
+            Keys.Enter => 66, Keys.Back => 67, Keys.Escape => 4, Keys.Tab => 61, Keys.Delete => 112,
+            Keys.Up => 19, Keys.Down => 20, Keys.Left => 21, Keys.Right => 22, Keys.Home => 122, Keys.End => 123,
             _ => null,
         };
-        if (linux != null) { Touch.Key(linux); return; }
+        if (android is { } code)
+        {
+            KeyInjector.For(_sdk.Adb, _serial).Press(code);
+            foreach (var f in Touch.Followers) KeyInjector.For(_sdk.Adb, f).Press(code);
+            return;
+        }
         var ch = ToChar(key);
         if (ch != null) Touch.Text(ch);
     }
@@ -480,8 +486,11 @@ sealed class GameSession : IDisposable
         Touch.Move(_slots[b], target.Item1, target.Item2);
     }
 
-    WheelGesture? _wheel;
+    WheelGesture? _wheel, _hwheel;
+    PinchGesture? _pinch;
     public void Wheel(double u, double v, int delta) { if (!Editing) (_wheel ??= new WheelGesture(Touch)).Wheel(u, v, delta); }
+    public void HWheel(double u, double v, int delta) { if (!Editing) (_hwheel ??= new WheelGesture(Touch, horizontal: true)).Wheel(u, v, delta); }
+    public void Pinch(double u, double v, int delta) { if (!Editing) (_pinch ??= new PinchGesture(Touch)).Wheel(u, v, delta); }
 
     public void MouseDown(double u, double v) { if (Editing) return; _mouseDown = true; Touch.Down(9, u, v); }
     public void MouseMove(double u, double v) { if (!Editing && _mouseDown) Touch.Move(9, u, v); }
@@ -740,6 +749,23 @@ sealed class GameSession : IDisposable
         }
 
         protected override void OnDeactivate(EventArgs e) { _s.ReleaseAll(); base.OnDeactivate(e); } // no stuck keys
+
+        // Wheel with modifiers, read from the message itself: Ctrl = pinch zoom, Shift (or tilt) = horizontal.
+        protected override void WndProc(ref Message m)
+        {
+            if (!_s.Editing && m.Msg is 0x020A or 0x020E)
+            {
+                int keys = (int)((long)m.WParam & 0xFFFF), delta = (short)(((long)m.WParam >> 16) & 0xFFFF);
+                var p = PointToClient(new Point((short)((long)m.LParam & 0xFFFF), (short)(((long)m.LParam >> 16) & 0xFFFF)));
+                var (u, v) = Norm(p);
+                if (m.Msg == 0x020E) _s.HWheel(u, v, delta);
+                else if ((keys & 0x0008) != 0) _s.Pinch(u, v, delta);       // MK_CONTROL
+                else if ((keys & 0x0004) != 0) _s.HWheel(u, v, -delta);     // MK_SHIFT
+                else _s.Wheel(u, v, delta);
+                return;
+            }
+            base.WndProc(ref m);
+        }
 
         protected override void OnMouseDown(MouseEventArgs e)
         {

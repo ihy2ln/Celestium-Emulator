@@ -315,12 +315,12 @@ partial class MainForm
 
         var buttons = NewCard("Buttons", 0, 150, wide: true);
         var bf = Flow(buttons);
-        Action(bf, "◁  Back", () => _sdk.KeyEvent(serial, 4));
-        Action(bf, "○  Home", () => _sdk.KeyEvent(serial, 3));
-        Action(bf, "▢  Recents", () => _sdk.KeyEvent(serial, 187));
-        Action(bf, "⏻  Power", () => _sdk.KeyEvent(serial, 26));
-        Action(bf, "🔊  Vol +", () => _sdk.KeyEvent(serial, 24));
-        Action(bf, "🔉  Vol −", () => _sdk.KeyEvent(serial, 25));
+        Action(bf, "◁  Back", () => PressKey(serial, 4));
+        Action(bf, "○  Home", () => PressKey(serial, 3));
+        Action(bf, "▢  Recents", () => PressKey(serial, 187));
+        Action(bf, "⏻  Power", () => PressKey(serial, 26));
+        Action(bf, "🔊  Vol +", () => PressKey(serial, 24));
+        Action(bf, "🔉  Vol −", () => PressKey(serial, 25));
         Action(bf, "⟳  Rotate", () => con.Send("rotate"));
         Action(bf, "📷  Screenshot", () => TakeScreenshot(v.Avd));
         if (DeviceProfile.Find(v.Info.Profile)?.Foldable == true)
@@ -843,6 +843,13 @@ partial class MainForm
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+
+    /// <summary>Android key press through the device's persistent shell (fast, and works where console keys don't).</summary>
+    Task PressKey(string serial, int keycode)
+    {
+        KeyInjector.For(_sdk.Adb, serial).Press(keycode);
+        return Task.CompletedTask;
+    }
 
     // ── Game mode ───────────────────────────────────────────────────────────
 

@@ -4,9 +4,29 @@
 
 Drag **any edge** of a device window and it resizes with the correct proportions. Celestium adds invisible grab strips along each edge, because the emulator itself only resizes from its corners. Dragging a corner still works too.
 
-## Mouse and scrolling
+## Mouse and keyboard
 
-By default the mouse works like a finger: clicking taps, and dragging swipes or flings. Turning the **wheel** over a device window scrolls smoothly. Each notch moves the page a fixed distance, so a quick spin never counts as a tap. You can switch a device to the emulator's desktop-pointer mode in **Settings › Hardware**.
+Celestium is built for a mouse and keyboard. On a device window:
+
+| You do | Android gets |
+|---|---|
+| Click | Tap |
+| Click and drag | Swipe or fling |
+| Hold the mouse button | Long press |
+| Wheel | Smooth scroll (a fixed distance per notch, never a tap) |
+| Shift+wheel, or tilting the wheel | Sideways scroll |
+| Ctrl+wheel, or touchpad pinch | Pinch to zoom |
+| Right-click, or the mouse's Back button | Back |
+| Esc | Back |
+| Typing, Enter, Backspace, arrow keys | The same keys, sent to the app |
+| Ctrl+C / V / X / A / Z, Ctrl+arrows, Ctrl+Backspace | Normal text editing in the app |
+
+Things to know:
+
+- You can turn off the Back buttons (right-click, mouse Back and Esc) and the Ctrl shortcuts in **⋯ › Settings**.
+- The Ctrl-shortcut setting applies to device windows opened afterwards.
+- Esc only acts as Back while a device window is in front. Everywhere else it's untouched.
+- To use the emulator's desktop-pointer mode for a device instead, turn on **Settings › Hardware › Mouse as a desktop pointer**.
 
 ## Fleet tools
 

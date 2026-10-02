@@ -107,6 +107,22 @@ partial class MainForm
     // ── App settings ────────────────────────────────────────────────────────
 
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    const string EmulatorSettingsKey = @"Software\Android Open Source Project\Emulator";
+
+    /// <summary>
+    /// The emulator keeps Ctrl shortcuts (Ctrl+Left/Right rotate, Ctrl+Backspace = back, Ctrl+H/S/P/O…) for its own
+    /// controls by default, which breaks normal PC text editing in apps. Its "send keyboard shortcuts to the virtual
+    /// device" setting fixes that; it's read when a device window opens.
+    /// </summary>
+    void ApplyEmulatorKeyboardSetting()
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(EmulatorSettingsKey);
+            k.SetValue("set/forwardShortcutsToDevice", _state.ShortcutsToApps ? 1 : 0, Microsoft.Win32.RegistryValueKind.DWord);
+        }
+        catch { }
+    }
 
     static bool StartsWithWindows()
     {
@@ -123,7 +139,7 @@ partial class MainForm
 
     void ShowAppSettings()
     {
-        using var f = DarkDialog("Celestium settings", 520, 470);
+        using var f = DarkDialog("Celestium settings", 520, 590);
         int y = 20;
         Control Row(string label, Control right, string? hint = null)
         {
@@ -146,6 +162,10 @@ partial class MainForm
         Row("Start hidden in the tray", hidden);
         var reopen = new Toggle(); reopen.SetQuiet(_state.RestoreInstances);
         Row("Reopen devices that were running", reopen, "After a reboot, devices you left running start again.");
+        var backs = new Toggle(); backs.SetQuiet(_state.PcBackButtons);
+        Row("Right-click, Esc and mouse Back = Android Back", backs);
+        var shortcuts = new Toggle(); shortcuts.SetQuiet(_state.ShortcutsToApps);
+        Row("Ctrl shortcuts go to apps", shortcuts, "Ctrl+C/V/A/Z, Ctrl+arrows… work in apps. Applies to newly opened device windows.");
 
         var media = new TextBox { Width = 250, Text = MediaFolder, BorderStyle = BorderStyle.FixedSingle };
         Row("Screenshots & recordings", media);
@@ -164,9 +184,9 @@ partial class MainForm
             Location = new Point(22, y + 6), AutoSize = true, ForeColor = Ui.T.SubText, Font = Theme.Small, Tag = "sub",
         });
 
-        var save = new PillButton("Save", PillStyle.Primary) { Location = new Point(390, 410), Width = 108 };
+        var save = new PillButton("Save", PillStyle.Primary) { Location = new Point(390, 530), Width = 108 };
         save.Click += (_, _) => { f.DialogResult = DialogResult.OK; f.Close(); };
-        var data = new PillButton("Open data folder") { Location = new Point(22, 410) };
+        var data = new PillButton("Open data folder") { Location = new Point(22, 530) };
         data.Click += (_, _) => Sdk.Launch("explorer.exe", $"\"{Paths.DataDir}\"");
         f.Controls.AddRange(new Control[] { save, data });
         if (f.ShowDialog(this) != DialogResult.OK) return;
@@ -174,6 +194,9 @@ partial class MainForm
         _state.Theme = theme.SelectedIndex switch { 1 => "light", 2 => "dark", _ => "system" };
         _state.StartHidden = hidden.On;
         _state.RestoreInstances = reopen.On;
+        _state.PcBackButtons = backs.On;
+        _state.ShortcutsToApps = shortcuts.On;
+        ApplyEmulatorKeyboardSetting();
         _state.MediaFolder = media.Text.Trim().Length > 0 && media.Text.Trim() != MediaFolder ? media.Text.Trim() : _state.MediaFolder;
         try { if (startWin.On != StartsWithWindows()) SetStartWithWindows(startWin.On); }
         catch (Exception ex) { SetStatus("Couldn't change the startup setting: " + ex.Message); }
