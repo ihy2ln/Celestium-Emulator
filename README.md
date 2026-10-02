@@ -2,6 +2,18 @@
 
 A lightweight Windows launcher for the official Android Emulator — a replacement for MuMu Player. Run multiple Android instances, install APKs by drag-and-drop, and open logcat/adb shell in one click.
 
+## Documentation
+The full guide is in [docs/](docs/README.md). It's also built into the app: press **F1** or **?**, or choose **⋯ › Help**.
+
+- [Getting started](docs/01-getting-started.md)
+- [Devices](docs/02-devices.md)
+- [Phone controls](docs/03-controls.md)
+- [Apps and files](docs/04-apps-files.md)
+- [Game mode](docs/05-game-mode.md)
+- [Windows and fleet tools](docs/06-windows-tools.md)
+- [Command line](docs/07-command-line.md)
+- [Updates and troubleshooting](docs/08-updates-troubleshooting.md)
+
 ## Features
 - **Modern design:** a device sidebar with live screen thumbnails, a detail panel with Overview, Controls, Snapshots and Settings tabs, and light and dark themes that follow Windows. Shortcuts: Ctrl+1–6 switch tabs, Ctrl+N creates a device, Ctrl+G opens game mode, Ctrl+S takes a screenshot, F5 refreshes.
 - **Resize from any edge:** drag any side of an emulator window and it scales with the correct proportions. Normally the emulator only resizes from its corners.
@@ -20,6 +32,7 @@ A lightweight Windows launcher for the official Android Emulator — a replaceme
 - **Macros:** record what you do in game mode and play it back once or on a loop (right-click ▶).
 - **Multi-device sync:** mirror every touch and keystroke from one device to all other running devices.
 - **Fleet tools** (⋯ menu): start all, stop all, arrange all device windows in a grid, and keep any device always on top.
+- **Built-in help:** a searchable guide with the same pages as `docs/`. Press F1 for the page about the tab you're on.
 - **App settings:** theme, start with Windows (hidden in the tray), reopen devices, and the screenshot/recording folder. Also an HTTP proxy per device (Controls › Network).
 - **Many devices at once,** each with a project label and a fixed adb serial. Multiple app windows.
 - **Background mode** (no window) and memory caps for devices that tools drive.

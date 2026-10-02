@@ -32,6 +32,7 @@ static class Program
         MainForm.SyncOnStart = args.Contains("--sync"); // with --game: turn sync on
         MainForm.StartInTray = args.Contains("--tray"); // Windows startup: open hidden in the tray
         MainForm.MacroSelfTest = args.Contains("--macro-selftest"); // with --game: record H, replay it, log to %TEMP%
+        MainForm.HelpOnStart = Arg("--help"); // open help at a topic, e.g. --help "Game mode"
         if (int.TryParse(Arg("--tab"), out var tab)) MainForm.StartTab = Math.Clamp(tab - 1, 0, 5);
 
         if (!primary && !forceNewWindow)

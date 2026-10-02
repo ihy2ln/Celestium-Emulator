@@ -22,6 +22,7 @@ partial class MainForm
         m.Items.Add("Arrange device windows", null, (_, _) => ArrangeWindows()).Enabled = running > 0;
         m.Items.Add(new ToolStripSeparator());
         m.Items.Add("Settings…", null, (_, _) => ShowAppSettings());
+        m.Items.Add("Help (F1)", null, (_, _) => HelpWindow.Open(this));
         m.Items.Add("Check for updates", null, async (_, _) => await CheckForUpdate(manual: true));
         m.Items.Add("Keyboard shortcuts", null, (_, _) => MessageBox.Show(this,
             "Ctrl+1 … Ctrl+6   switch tabs\nCtrl+N   new device\nCtrl+G   game mode for the selected device\nCtrl+S   screenshot\nF5   refresh\n\nIn game mode: mapped keys tap the screen, other keys type, Esc = Back.",

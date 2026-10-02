@@ -8,7 +8,7 @@ namespace DroidLauncher;
 static class AppInfo
 {
     /// <summary>The real app version. The exe's file version stays 1.0.0 so the exe never changes (see the csproj).</summary>
-    public const string Version = "1.5.0";
+    public const string Version = "1.6.0";
 }
 
 record Config(string SdkRoot)

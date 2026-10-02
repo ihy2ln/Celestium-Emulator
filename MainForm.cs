@@ -13,6 +13,7 @@ partial class MainForm : Form
     public static bool SyncOnStart;
     public static bool StartInTray;
     public static bool MacroSelfTest;
+    public static string? HelpOnStart;
 
     readonly Sdk _sdk;
     readonly AppState _state;
@@ -132,6 +133,7 @@ partial class MainForm : Form
                 if (_state.LastUpdateCheck is not { } last || DateTime.UtcNow - last > TimeSpan.FromHours(12)) _ = CheckForUpdate(manual: false);
             }
             if (CheckUpdateOnStart) await CheckForUpdate(manual: true);
+            if (HelpOnStart != null) HelpWindow.Open(this, HelpOnStart);
             if (GameOnStart && _selected != null)
             {
                 StartGame(_selected);
@@ -159,6 +161,7 @@ partial class MainForm : Form
             if (e.Control && e.KeyCode is >= Keys.D1 and <= Keys.D6) { _tabs.Select(e.KeyCode - Keys.D1); e.Handled = true; }
             else if (e.Control && e.KeyCode == Keys.N) { e.Handled = true; await NewInstance(null); }
             else if (e.KeyCode == Keys.F5) { e.Handled = true; await Reload(); }
+            else if (e.KeyCode == Keys.F1) { e.Handled = true; HelpWindow.Open(this, HelpTopicForTab()); }
             else if (e.Control && e.KeyCode == Keys.G && Selected is { Running: true } gs) { e.Handled = true; StartGame(gs.Avd); }
             else if (e.Control && e.KeyCode == Keys.S && Selected is { Running: true } s) { e.Handled = true; try { await TakeScreenshot(s.Avd); } catch (Exception ex) { SetStatus(ex.Message); } }
         };
@@ -184,6 +187,9 @@ partial class MainForm : Form
             ApplyTheme();
             SetStatus($"Theme: {_state.Theme}.");
         };
+        var help = new PillButton("?", PillStyle.Ghost) { Width = 40, Margin = new Padding(0, 0, 4, 0) };
+        _tips.SetToolTip(help, "Help (F1)");
+        help.Click += (_, _) => HelpWindow.Open(this, HelpTopicForTab());
         var more = new PillButton("⋯", PillStyle.Ghost) { Width = 40, Margin = new Padding(0, 0, 4, 0) };
         _tips.SetToolTip(more, "More: start/stop all, arrange windows, settings");
         more.Click += (_, _) => ShowMoreMenu(more);
@@ -195,7 +201,7 @@ partial class MainForm : Form
         var add = new PillButton("+  New device", PillStyle.Primary) { Margin = new Padding(0) };
         add.Click += async (_, _) => await NewInstance(null);
         _updateButton.Click += async (_, _) => await OfferUpdate(manual: true);
-        buttons.Controls.AddRange(new Control[] { _updateButton, more, theme, window, apk, add });
+        buttons.Controls.AddRange(new Control[] { _updateButton, help, more, theme, window, apk, add });
         _header.Controls.Add(buttons);
     }
 
@@ -221,6 +227,15 @@ partial class MainForm : Form
     }
 
     void SetStatus(string s) => _status.Text = s;
+
+    /// <summary>F1 opens the help page for the tab you're on.</summary>
+    string HelpTopicForTab() => _tabs.SelectedIndex switch
+    {
+        1 => "Phone controls",
+        2 or 3 => "Apps and files",
+        4 or 5 => "Devices",
+        _ => "Getting started",
+    };
 
     // ── Window state ────────────────────────────────────────────────────────
 
@@ -304,6 +319,7 @@ partial class MainForm : Form
         if (_avds.Count > 0) menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("New device…", null, async (_, _) => { ShowFromTray(); await NewInstance(null); });
         menu.Items.Add("New window", null, (_, _) => OpenNewWindow());
+        menu.Items.Add("Help", null, (_, _) => { ShowFromTray(); HelpWindow.Open(this); });
         menu.Items.Add("Open media folder", null, (_, _) => { Directory.CreateDirectory(MediaFolder); Sdk.Launch("explorer.exe", $"\"{MediaFolder}\""); });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Reopen running devices on launch", null, (_, _) => { _state.RestoreInstances = !_state.RestoreInstances; _state.Save(); }) { Checked = _state.RestoreInstances });

@@ -42,5 +42,7 @@
     <Compile Remove="cli/**" />
     <None Remove="cli/**" />
     <None Update="launcher.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Help pages: the same Markdown as docs/ on GitHub, built into the app (the .dll, so the .exe stays unchanged). -->
+    <EmbeddedResource Include="docs\0*.md" LogicalName="docs/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
