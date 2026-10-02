@@ -16,20 +16,29 @@ class MainForm : Form
     readonly System.Windows.Forms.Timer _poll = new() { Interval = 3000 };
     Dictionary<string, (string serial, string state)> _running = new();
     readonly Dictionary<string, bool> _booted = new();
+    readonly AppState _state;
+    readonly NotifyIcon _tray = new();
+    List<string> _avds = new();
     bool _refreshing;
+    bool _quitting;
+    bool _restoredInstances;
+    bool _loaded;
+    bool _sessionEnding;
 
-    public MainForm(Config cfg)
+    public MainForm(Config cfg, AppState state)
     {
         _sdk = new Sdk(cfg);
+        _state = state;
         Text = "Celestium Emulator";
         BackColor = Bg;
         ForeColor = Fg;
         Font = new Font("Segoe UI", 10f);
-        ClientSize = new Size(620, 520);
         MinimumSize = new Size(560, 360);
-        StartPosition = FormStartPosition.CenterScreen;
         AllowDrop = true;
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        RestoreBoundsFromState();
+        BuildTray();
+        Microsoft.Win32.SystemEvents.SessionEnding += (_, _) => _sessionEnding = true;
 
         var header = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Panel, Padding = new Padding(16, 0, 12, 0) };
         var title = new Label
@@ -88,9 +97,141 @@ class MainForm : Form
                 SetStatus($"emulator.exe not found at {_sdk.Emulator} — check launcher.json");
                 return;
             }
+            if (_loaded) return;
             await Reload();
             _poll.Start();
         };
+
+        FormClosing += (_, e) =>
+        {
+            SaveBounds();
+            // The X button hides to the tray; only Quit (tray menu), Windows shutdown or Task Manager really exit.
+            if (e.CloseReason == CloseReason.UserClosing && !_quitting)
+            {
+                e.Cancel = true;
+                HideToTray();
+                return;
+            }
+            _tray.Visible = false;
+            _state.Save();
+        };
+        ResizeEnd += (_, _) => SaveBounds();
+    }
+
+    // ── Window state ────────────────────────────────────────────────────────
+
+    void RestoreBoundsFromState()
+    {
+        var bounds = new Rectangle(_state.X, _state.Y, Math.Max(_state.Width, 560), Math.Max(_state.Height, 360));
+        // Only reuse the saved spot if it's still visible on a connected monitor.
+        bool onScreen = _state.X != int.MinValue && Screen.AllScreens.Any(s => s.WorkingArea.IntersectsWith(
+            new Rectangle(bounds.X, bounds.Y, Math.Min(bounds.Width, 200), 40)));
+        if (onScreen)
+        {
+            StartPosition = FormStartPosition.Manual;
+            Bounds = bounds;
+        }
+        else
+        {
+            StartPosition = FormStartPosition.CenterScreen;
+            ClientSize = new Size(620, 520);
+        }
+        if (_state.Maximized) WindowState = FormWindowState.Maximized;
+    }
+
+    void SaveBounds()
+    {
+        if (!Visible || WindowState == FormWindowState.Minimized) return;
+        var b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
+        _state.X = b.X; _state.Y = b.Y; _state.Width = b.Width; _state.Height = b.Height;
+        _state.Maximized = WindowState == FormWindowState.Maximized;
+        _state.Save();
+    }
+
+    protected override void SetVisibleCore(bool value)
+    {
+        // Launched with "start in tray": create the window but keep it hidden.
+        if (!IsHandleCreated && _state.StartHidden && value)
+        {
+            CreateHandle();
+            value = false;
+            BeginInvoke(new Action(async () =>
+            {
+                if (File.Exists(_sdk.Emulator)) { await Reload(); _poll.Start(); }
+            }));
+        }
+        base.SetVisibleCore(value);
+    }
+
+    // ── Tray ────────────────────────────────────────────────────────────────
+
+    void BuildTray()
+    {
+        _tray.Icon = Icon;
+        _tray.Text = "Celestium Emulator";
+        _tray.Visible = true;
+        _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) ShowFromTray(); };
+
+        var menu = new ContextMenuStrip();
+        menu.Opening += (_, _) => FillTrayMenu(menu);
+        FillTrayMenu(menu);
+        _tray.ContextMenuStrip = menu;
+    }
+
+    void FillTrayMenu(ContextMenuStrip menu)
+    {
+        menu.Items.Clear();
+        var open = new ToolStripMenuItem("Open Celestium Emulator", null, (_, _) => ShowFromTray()) { Font = new Font(menu.Font, FontStyle.Bold) };
+        menu.Items.Add(open);
+        menu.Items.Add(new ToolStripSeparator());
+        foreach (var avd in _avds)
+        {
+            var running = _running.ContainsKey(avd);
+            menu.Items.Add(running ? $"Stop {avd}" : $"Start {avd}", null, async (_, _) => await ToggleStart(avd));
+        }
+        if (_avds.Count > 0) menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Install APK…", null, async (_, _) => { ShowFromTray(); await PickAndInstall(); });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(new ToolStripMenuItem("Reopen running instances on launch", null, (_, _) =>
+        {
+            _state.RestoreInstances = !_state.RestoreInstances;
+            _state.Save();
+        }) { Checked = _state.RestoreInstances });
+        menu.Items.Add(new ToolStripMenuItem("Start hidden in tray", null, (_, _) =>
+        {
+            _state.StartHidden = !_state.StartHidden;
+            _state.Save();
+        }) { Checked = _state.StartHidden });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Quit", null, (_, _) => Quit());
+    }
+
+    void HideToTray()
+    {
+        Hide();
+        if (!_state.TrayHintShown)
+        {
+            _tray.ShowBalloonTip(4000, "Celestium Emulator is still running",
+                "It's in the system tray. Right-click the tray icon and choose Quit to exit.", ToolTipIcon.Info);
+            _state.TrayHintShown = true;
+            _state.Save();
+        }
+    }
+
+    public void ShowFromTray()
+    {
+        if (!Visible) Show();
+        if (WindowState == FormWindowState.Minimized) WindowState = _state.Maximized ? FormWindowState.Maximized : FormWindowState.Normal;
+        Activate();
+        BringToFront();
+    }
+
+    void Quit()
+    {
+        _quitting = true;
+        SaveBounds();
+        Close();
+        Application.Exit();
     }
 
     static Button MakeButton(string text, Color back, Color fore)
@@ -110,11 +251,25 @@ class MainForm : Form
     {
         SetStatus("Loading instances…");
         var avds = await _sdk.ListAvds();
+        _avds = avds;
+        _loaded = true;
         _list.Controls.Clear();
         foreach (var avd in avds) _list.Controls.Add(BuildCard(avd));
         if (avds.Count == 0) SetStatus("No AVDs found. Create one with avdmanager.");
         await RefreshState();
         if (avds.Count > 0) SetStatus("Drag an .apk onto this window to install it on the running instance.");
+        RestoreInstances();
+    }
+
+    /// <summary>Once per launch: start the instances that were running last time and aren't anymore (e.g. after a reboot).</summary>
+    void RestoreInstances()
+    {
+        if (_restoredInstances) return;
+        _restoredInstances = true;
+        if (!_state.RestoreInstances) return;
+        var toStart = _state.RunningInstances.Where(a => _avds.Contains(a) && !_running.ContainsKey(a)).ToList();
+        foreach (var avd in toStart) StartWith(avd, "");
+        if (toStart.Count > 0) SetStatus($"Reopening {string.Join(", ", toStart)} from last session…");
     }
 
     Control BuildCard(string avd)
@@ -205,6 +360,15 @@ class MainForm : Form
         try
         {
             _running = await _sdk.RunningAvds();
+            if (_restoredInstances && !_sessionEnding)
+            {
+                var now = _running.Keys.Where(_avds.Contains).OrderBy(a => a).ToList();
+                if (!now.SequenceEqual(_state.RunningInstances.OrderBy(a => a)))
+                {
+                    _state.RunningInstances = now;
+                    _state.Save();
+                }
+            }
             foreach (Control card in _list.Controls)
             {
                 var avd = (string)card.Tag!;
@@ -238,7 +402,10 @@ class MainForm : Form
     async Task PickAndInstall()
     {
         using var dlg = new OpenFileDialog { Filter = "Android packages (*.apk)|*.apk", Multiselect = true, Title = "Install APK" };
+        if (Directory.Exists(_state.LastApkFolder)) dlg.InitialDirectory = _state.LastApkFolder;
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
+        _state.LastApkFolder = Path.GetDirectoryName(dlg.FileNames[0]);
+        _state.Save();
         foreach (var f in dlg.FileNames) await InstallApk(f);
     }
 

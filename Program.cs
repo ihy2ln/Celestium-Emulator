@@ -5,13 +5,73 @@ namespace DroidLauncher;
 
 record Config(string SdkRoot);
 
+/// <summary>Everything the app remembers between runs, kept in %APPDATA%\CelestiumEmulator\state.json.</summary>
+class AppState
+{
+    public int X { get; set; } = int.MinValue;
+    public int Y { get; set; }
+    public int Width { get; set; } = 620;
+    public int Height { get; set; } = 520;
+    public bool Maximized { get; set; }
+    public bool StartHidden { get; set; }
+    public bool RestoreInstances { get; set; } = true;
+    public bool TrayHintShown { get; set; }
+    public string? LastApkFolder { get; set; }
+    public List<string> RunningInstances { get; set; } = new();
+
+    static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CelestiumEmulator");
+    static string FilePath => Path.Combine(Dir, "state.json");
+
+    public static AppState Load()
+    {
+        try
+        {
+            if (File.Exists(FilePath))
+                return JsonSerializer.Deserialize<AppState>(File.ReadAllText(FilePath)) ?? new AppState();
+        }
+        catch { }
+        return new AppState();
+    }
+
+    public void Save()
+    {
+        try
+        {
+            Directory.CreateDirectory(Dir);
+            var tmp = FilePath + ".tmp";
+            File.WriteAllText(tmp, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(tmp, FilePath, true);
+        }
+        catch { }
+    }
+}
+
 static class Program
 {
+    const string MutexName = "CelestiumEmulator.SingleInstance";
+    const string ShowEventName = "CelestiumEmulator.ShowWindow";
+
     [STAThread]
     static void Main()
     {
+        // One copy only: launching again (shortcut, exe) just brings the existing window back from the tray.
+        using var mutex = new Mutex(true, MutexName, out bool first);
+        if (!first)
+        {
+            try { using var ev = EventWaitHandle.OpenExisting(ShowEventName); ev.Set(); } catch { }
+            return;
+        }
+        using var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
+
         ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm(LoadConfig()));
+        var form = new MainForm(LoadConfig(), AppState.Load());
+        var listener = new Thread(() =>
+        {
+            while (showEvent.WaitOne())
+                try { form.BeginInvoke(new Action(form.ShowFromTray)); } catch { return; }
+        }) { IsBackground = true };
+        listener.Start();
+        Application.Run(form);
     }
 
     static Config LoadConfig()

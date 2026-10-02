@@ -8,6 +8,19 @@
     <AssemblyName>CelestiumEmulator</AssemblyName>
     <RootNamespace>DroidLauncher</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- File properties shown in Explorer and read by antivirus reputation checks. -->
+    <Product>Celestium Emulator</Product>
+    <AssemblyTitle>Celestium Emulator</AssemblyTitle>
+    <Description>Launcher for the official Android Emulator</Description>
+    <Company>ihy2ln</Company>
+    <Authors>ihy2ln</Authors>
+    <Copyright>Copyright © 2026 ihy2ln</Copyright>
+    <Version>1.1.0</Version>
+    <RepositoryUrl>https://github.com/ihy2ln/Celestium-Emulator</RepositoryUrl>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
   <ItemGroup>
     <None Update="launcher.json" CopyToOutputDirectory="PreserveNewest" />
