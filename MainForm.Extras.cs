@@ -42,6 +42,27 @@ partial class MainForm
         try { using var p = Process.GetProcessById(pid); return p.MainWindowHandle; } catch { return IntPtr.Zero; }
     }
 
+    /// <summary>Device windows whose mouse acts as a finger (the wheel then scrolls with a swipe), by window → serial.</summary>
+    Dictionary<IntPtr, string> FingerModeWindows()
+    {
+        var map = new Dictionary<IntPtr, string>();
+        foreach (var v in _views.Values.Where(v => v.Running && v.Serial != null && !v.Info.Headless && !v.Info.MouseAsPointer))
+        {
+            var h = EmulatorWindow(v.Avd);
+            if (h != IntPtr.Zero) map[h] = v.Serial!;
+        }
+        return map;
+    }
+
+    /// <summary>Whether the window in front belongs to a device (the user is using it right now).</summary>
+    bool DeviceWindowInFront()
+    {
+        var fg = GetForegroundWindow();
+        return fg != IntPtr.Zero && _views.Values.Any(v => v.Running && !v.Info.Headless && EmulatorWindow(v.Avd) == fg);
+    }
+
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+
     /// <summary>Tile every visible device window in a grid on the monitor Celestium is on, keeping their proportions.</summary>
     void ArrangeWindows()
     {

@@ -546,7 +546,7 @@ partial class MainForm
     {
         bool stopped = !v.Running && !v.Starting;
 
-        var hw = NewCard("Hardware", Half, 300);
+        var hw = NewCard("Hardware", Half, 340);
         var hf = Flow(hw);
         var profile = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, Width = 200, Font = Theme.Body };
         profile.Items.Add("Keep current screen");
@@ -566,6 +566,9 @@ partial class MainForm
         hf.Controls.Add(Line("CPU", coresBox, 318));
         var bg = new Toggle(); bg.SetQuiet(v.Info.Headless);
         hf.Controls.Add(Line("Run in background (no window)", bg, 318));
+        var pointer = new Toggle(); pointer.SetQuiet(v.Info.MouseAsPointer);
+        _tips.SetToolTip(pointer, "Off (recommended): the mouse is a finger: click = tap, drag = swipe, wheel = scroll.\nOn: the emulator's desktop-mouse mode with a pointer; some apps won't scroll or click with it.");
+        hf.Controls.Add(Line("Mouse as a desktop pointer", pointer, 318));
         Action(hf, "Save hardware", () =>
         {
             InstanceStore.Edit(v.Avd, i =>
@@ -573,6 +576,7 @@ partial class MainForm
                 i.RamMb = ramChoices[ramBox.SelectedIndex];
                 i.Cores = coreChoices[coresBox.SelectedIndex];
                 i.Headless = bg.On;
+                i.MouseAsPointer = pointer.On;
                 if (PerfPreset.Find(i.Preset) is { } pp && (pp.RamMb != i.RamMb || pp.EffectiveCores != i.Cores)) i.Preset = null;
             });
             if (profile.SelectedIndex > 0 && stopped) AvdFactory.ApplyProfile(v.Avd, DeviceProfile.All[profile.SelectedIndex - 1]);
@@ -651,10 +655,9 @@ partial class MainForm
         {
             if (_usage != null) _usage.Text = v.Running ? Usage(v.Avd) : "—";
             if (_preview == null || !v.Running || v.Serial == null || !v.Booted) return;
-            var png = await _sdk.Screencap(v.Serial);
-            if (png == null || _preview == null || _selected != v.Avd) return;
-            using var ms = new MemoryStream(png);
-            using var full = Image.FromStream(ms);
+            if (DeviceWindowInFront()) return; // you're using a device: don't spend anything on the preview
+            using var full = await CaptureImage(v);
+            if (full == null || _preview == null || _selected != v.Avd) return;
             var shown = new Bitmap(full, new Size(Math.Max(1, full.Width / 3), Math.Max(1, full.Height / 3)));
             var old = _preview.Image;
             _preview.Image = shown;
@@ -664,6 +667,60 @@ partial class MainForm
         catch { }
         finally { _previewBusy = false; }
     }
+
+    /// <summary>
+    /// Screenshot taken by the emulator on the PC side from its frame buffer, so Android itself does no work (its own
+    /// screencap costs the phone ~0.5 s of CPU and made taps and swipes stutter). Falls back to screencap if needed.
+    /// </summary>
+    async Task<byte[]?> CaptureScreen(string serial, bool hostSide = true)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "celestium_shots", serial);
+        if (hostSide && !dir.Contains(' ')) // the console splits its arguments on spaces
+        {
+            try
+            {
+                Directory.CreateDirectory(dir);
+                foreach (var old in Directory.GetFiles(dir)) File.Delete(old);
+                await EmulatorConsole.For(serial).Send($"screenrecord screenshot {dir}");
+                var file = Directory.GetFiles(dir, "*.png").FirstOrDefault();
+                if (file != null)
+                {
+                    var bytes = await File.ReadAllBytesAsync(file);
+                    File.Delete(file);
+                    return bytes;
+                }
+            }
+            catch { }
+        }
+        return await _sdk.Screencap(serial);
+    }
+
+    /// <summary>
+    /// The device's screen as an image, for previews. The emulator's own screenshot sometimes has width and height
+    /// swapped (portrait content squeezed into a landscape frame after the device has been rotated), so it's
+    /// matched against the device window's actual shape. Background devices have no window: Android's capture.
+    /// </summary>
+    async Task<Image?> CaptureImage(DeviceView v)
+    {
+        var window = v.Info.Headless ? IntPtr.Zero : EmulatorWindow(v.Avd);
+        var png = await CaptureScreen(v.Serial!, hostSide: window != IntPtr.Zero);
+        if (png == null) return null;
+        Image img;
+        using (var ms = new MemoryStream(png)) img = new Bitmap(Image.FromStream(ms));
+        if (window != IntPtr.Zero && GetClientRect(window, out var c) && c.Right > 0 && c.Bottom > 0)
+        {
+            bool windowPortrait = c.Bottom > c.Right, imagePortrait = img.Height > img.Width;
+            if (windowPortrait != imagePortrait)
+            {
+                var fixedImg = new Bitmap(img, img.Height, img.Width);
+                img.Dispose();
+                img = fixedImg;
+            }
+        }
+        return img;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool GetClientRect(IntPtr h, out RECT r);
 
     string Usage(string avd)
     {

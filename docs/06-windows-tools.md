@@ -4,6 +4,10 @@
 
 Drag **any edge** of a device window and it resizes with the correct proportions. Celestium adds invisible grab strips along each edge, because the emulator itself only resizes from its corners. Dragging a corner still works too.
 
+## Mouse and scrolling
+
+By default the mouse works like a finger: clicking taps, and dragging swipes or flings. Turning the **wheel** over a device window scrolls smoothly. Each notch moves the page a fixed distance, so a quick spin never counts as a tap. You can switch a device to the emulator's desktop-pointer mode in **Settings › Hardware**.
+
 ## Fleet tools
 
 These are in the **⋯** menu:

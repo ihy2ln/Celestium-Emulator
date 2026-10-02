@@ -12,6 +12,8 @@ Celestium isn't code-signed, so antivirus that checks reputation may look at it 
 
 **A device says "didn't start".** Try **Settings › Cold boot**. If that fails, check that Windows Hypervisor Platform is on, and that you have free disk space on the drive where devices are stored.
 
+**Clicks don't open apps, dragging doesn't scroll, or the wheel acts like a click.** The device is using the emulator's desktop-mouse mode. In **Settings › Hardware**, make sure **Mouse as a desktop pointer** is off, press **Save hardware**, and restart the device. With it off, clicks are taps, drags are swipes, and the wheel scrolls smoothly.
+
 **The screen preview is black.** The device is still booting, or its screen is off. Press **Power** on the Controls tab.
 
 **Game mode doesn't react to keys.** Click the phone screen once so game mode has keyboard focus. Controller input only works while the game is in front.

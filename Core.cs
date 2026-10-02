@@ -8,7 +8,7 @@ namespace DroidLauncher;
 static class AppInfo
 {
     /// <summary>The real app version. The exe's file version stays 1.0.0 so the exe never changes (see the csproj).</summary>
-    public const string Version = "1.6.0";
+    public const string Version = "1.6.1";
 }
 
 record Config(string SdkRoot)
@@ -100,6 +100,11 @@ class InstanceInfo
     public string? CameraFront { get; set; }
     /// <summary>Pass the PC microphone through (-allow-host-audio). Off by default for privacy.</summary>
     public bool HostMic { get; set; }
+    /// <summary>
+    /// False (default): the PC mouse acts as a finger — click = tap, drag = swipe/fling, like a phone (and like MuMu).
+    /// True: the emulator's own "VirtioMouse" desktop-mouse mode, which many apps don't scroll or click with.
+    /// </summary>
+    public bool MouseAsPointer { get; set; }
     /// <summary>Device profile it was created with, for display.</summary>
     public string? Profile { get; set; }
 }
@@ -425,6 +430,8 @@ class Sdk(Config cfg)
         if (info.CameraBack is { Length: > 0 } back) args += $" -camera-back {back}";
         if (info.CameraFront is { Length: > 0 } front) args += $" -camera-front {front}";
         if (info.HostMic) args += " -allow-host-audio";
+        // Mouse as a finger: turn off the emulator's desktop-mouse device so clicks and drags arrive as touches.
+        if (!info.MouseAsPointer) args += " -feature -VirtioMouse,-VirtioDualModeMouse";
         Detached.Start(Emulator, $"{args} {extraArgs}".Trim());
         return "emulator-" + port;
     }

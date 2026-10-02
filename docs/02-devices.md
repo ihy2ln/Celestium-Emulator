@@ -37,6 +37,12 @@ Open **Settings** on a device to change its:
 - **Device profile:** only while the device is stopped. The next start is a cold boot.
 - **Memory and CPU,** or pick a preset on **Overview**. Changes apply the next time the device starts.
 - **Run in background (no window):** no screen and less RAM and GPU, for devices that only tools use.
+- **Mouse as a desktop pointer:** off by default, so your mouse works like a finger:
+  - **click** = tap
+  - **drag** = swipe or fling
+  - **wheel** = smooth scroll
+
+  Turn it on only if you want the emulator's desktop-mouse mode, with a pointer and hover. Many apps won't scroll or respond to clicks in that mode. The change applies the next time the device starts.
 - **Camera and microphone:** each camera can be a virtual scene, your PC webcam, or off. The PC microphone is off unless you turn it on.
 - **Project label.**
 

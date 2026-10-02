@@ -49,6 +49,7 @@ partial class MainForm : Form
     int _thumbRound;
     bool _refreshing, _quitting, _restoredInstances, _loaded, _sessionEnding;
     EdgeResizer? _edges;
+    WheelScroller? _wheel;
     readonly Microsoft.Win32.SessionEndingEventHandler _onSessionEnding;
     readonly Microsoft.Win32.UserPreferenceChangedEventHandler _onPrefs;
 
@@ -92,6 +93,7 @@ partial class MainForm : Form
             Microsoft.Win32.SystemEvents.UserPreferenceChanged -= _onPrefs;
             _poll.Stop(); _live.Stop();
             _edges?.Dispose();
+            _wheel?.Dispose();
             _tray.Visible = false;
             _tray.Dispose();
         };
@@ -154,7 +156,11 @@ partial class MainForm : Form
             _state.Save();
         };
         ResizeEnd += (_, _) => SaveBounds();
-        if (_primary || ForceEdges) _edges = new EdgeResizer();
+        if (_primary || ForceEdges)
+        {
+            _edges = new EdgeResizer();
+            _wheel = new WheelScroller(this, FingerModeWindows);
+        }
         KeyPreview = true;
         KeyDown += async (_, e) =>
         {
@@ -500,11 +506,9 @@ partial class MainForm : Form
         var v = others[(_thumbRound / 8) % others.Count];
         try
         {
-            var png = await _sdk.Screencap(v.Serial!);
-            if (png == null) return;
-            using var ms = new MemoryStream(png);
-            using var img = Image.FromStream(ms);
-            SetThumb(v.Avd, img);
+            if (DeviceWindowInFront()) return;
+            using var img = await CaptureImage(v);
+            if (img != null) SetThumb(v.Avd, img);
         }
         catch { }
     }

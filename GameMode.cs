@@ -480,6 +480,9 @@ sealed class GameSession : IDisposable
         Touch.Move(_slots[b], target.Item1, target.Item2);
     }
 
+    WheelGesture? _wheel;
+    public void Wheel(double u, double v, int delta) { if (!Editing) (_wheel ??= new WheelGesture(Touch)).Wheel(u, v, delta); }
+
     public void MouseDown(double u, double v) { if (Editing) return; _mouseDown = true; Touch.Down(9, u, v); }
     public void MouseMove(double u, double v) { if (!Editing && _mouseDown) Touch.Move(9, u, v); }
     public void MouseUp() { if (Editing || !_mouseDown) return; _mouseDown = false; Touch.Up(9); }
@@ -762,8 +765,8 @@ sealed class GameSession : IDisposable
 
         protected override void OnMouseWheel(MouseEventArgs e)
         {
-            if (!_s.Editing) return;
             var (u, v) = Norm(e.Location);
+            if (!_s.Editing) { _s.Wheel(u, v, e.Delta); return; }
             if (_s.HitTest(u, v) is { Kind: not BindingKind.Button } b)
             {
                 b.Radius = Math.Clamp(b.Radius * (e.Delta > 0 ? 1.1 : 0.9), 0.03, 0.3);
