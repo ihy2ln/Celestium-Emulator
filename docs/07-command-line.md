@@ -12,6 +12,8 @@ celestium new Weaverse --from Dev --project Weaverse
 celestium project Dev "Adams Haven"
 celestium memory Dev 3072                  # or: celestium memory Dev default
 celestium serial Weaverse
+celestium mem                              # memory report: Windows, devices, build daemons, ComfyUI
+celestium mem --free                       # stop idle build daemons, unload ComfyUI models
 celestium --version
 ```
 
@@ -25,6 +27,9 @@ celestium --version
 | new <name> --from <device> | Create a device with the same Android version and settings |
 | project <device> [label] | Set or clear the project label |
 | memory <device> <MB or default> | Set its RAM for future starts |
+| mem [--free] | Memory report. `--free` stops idle build daemons and unloads ComfyUI models. |
+
+`start` and `install` follow the same memory limit as the app. If a start would go over it, the command explains why, suggests a `--memory` size that fits, and exits with an error. Add `--force` to start anyway.
 
 ## Using it with adb, Gradle and Unity
 

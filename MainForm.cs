@@ -420,7 +420,7 @@ partial class MainForm : Form
         _restoredInstances = true;
         if (!_primary || !_state.RestoreInstances) return;
         var toStart = _state.RunningInstances.Where(a => _avds.Contains(a) && !_running.ContainsKey(a)).ToList();
-        foreach (var avd in toStart) StartWith(avd, "");
+        foreach (var avd in toStart) StartWith(avd, "", interactive: false);
         if (toStart.Count > 0) SetStatus($"Reopening {string.Join(", ", toStart)} from last session…");
     }
 
@@ -482,7 +482,9 @@ partial class MainForm : Form
                 tile.Invalidate();
             }
             int running = views.Values.Count(v => v.Running);
-            _subtitle.Text = $"{views.Count} device{(views.Count == 1 ? "" : "s")} · {running} running";
+            long used = views.Values.Where(v => v.Running).Sum(v => (long)MemoryGuard.EstimateMb(v.Avd, v.Info));
+            _subtitle.Text = $"{views.Count} device{(views.Count == 1 ? "" : "s")} · {running} running" +
+                (_state.MemoryBudgetPercent > 0 ? $" · {MemoryGuard.Gb(used)} of {MemoryGuard.Gb(MemoryGuard.BudgetMb(_state.MemoryBudgetPercent))} GB device memory" : "");
 
             UpdateDetailHeader();
             // Rebuild the page only when something it shows changed (running/booted state or settings).
@@ -515,12 +517,36 @@ partial class MainForm : Form
         catch { }
     }
 
-    void StartWith(string avd, string args)
+    void StartWith(string avd, string args, bool interactive = true)
     {
         if (_running.ContainsKey(avd) || _startingSince.ContainsKey(avd)) { SetStatus($"{avd} is already running."); return; }
+
+        // Memory guard: devices together stay within the budget, and only start if Windows has room.
+        var info = InstanceStore.Get(avd);
+        int ram = MemoryGuard.DeviceRamMb(avd, info);
+        int? ramOverride = null;
+        var store = InstanceStore.Load();
+        var active = _views.Values.Where(v => v.Running || v.Starting).Select(v => (v.Avd, store.TryGetValue(v.Avd, out var i) ? i : new InstanceInfo()));
+        var why = MemoryGuard.Check(avd, ram, active, _state.MemoryBudgetPercent, out var fits);
+        if (why != null)
+        {
+            if (!interactive) { SetStatus($"Didn't reopen {avd}: not enough memory."); return; }
+            if (fits >= MemoryGuard.MinDeviceRamMb &&
+                MessageBox.Show(this, $"{why}\n\nStart {avd} with {MemoryGuard.Gb(fits)} GB of RAM instead of {MemoryGuard.Gb(ram)} GB?",
+                    "Not enough memory", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                ramOverride = fits;
+            else
+            {
+                if (fits < MemoryGuard.MinDeviceRamMb)
+                    MessageBox.Show(this, $"{why}\n\nStop another device, or use ⋯ › Free up memory. The limit can be changed in ⋯ › Settings.",
+                        "Not enough memory", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SetStatus($"{avd} wasn't started: not enough memory.");
+                return;
+            }
+        }
         try
         {
-            var serial = _sdk.Start(avd, args);
+            var serial = _sdk.Start(avd, args, ramOverride);
             SetStatus($"Starting {avd} on {serial}…");
         }
         catch (Exception ex) { SetStatus($"Couldn't start {avd}: {ex.Message}"); return; }

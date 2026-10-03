@@ -1,15 +1,15 @@
-using DroidLauncher;
+﻿using DroidLauncher;
 
-// celestium — command-line control of Celestium Emulator instances, so any program (build scripts,
+// celestium â€” command-line control of Celestium Emulator instances, so any program (build scripts,
 // Gradle, Unity, AI agents) working on several projects at once can each claim its own device.
 // Instances are addressed by AVD name or project label; each has a fixed adb serial (emulator-<port>).
 
 const string Usage = """
-    celestium — control Celestium Emulator instances
+    celestium â€” control Celestium Emulator instances
 
     Usage:
       celestium list                                Show every instance (name, project, serial, state)
-      celestium start <instance> [--wait] [--cold] [--headless] [--memory <MB>]
+      celestium start <instance> [--wait] [--cold] [--headless] [--memory <MB>] [--force]
                                                     Boot it (no-op if running); --wait blocks until booted.
                                                     --headless = no window (less RAM/GPU), --memory caps guest RAM
       celestium stop <instance>                     Shut it down
@@ -19,6 +19,7 @@ const string Usage = """
                                                     Create an instance with the same settings as another
       celestium project <instance> [label]          Set (or clear) its project label
       celestium memory <instance> <MB|default>      Set its RAM cap for future starts (e.g. 2048)
+      celestium mem [--free]                        Memory report; --free stops idle build daemons and unloads ComfyUI models
 
     <instance> is an instance name or a project label.
     Tip: adb, Gradle and most Android tools target the device in ANDROID_SERIAL, e.g. in PowerShell:
@@ -63,6 +64,17 @@ async Task<string> StartAndMaybeWait(string avd, bool wait, bool cold)
     if (running.TryGetValue(avd, out var r)) serial = r.serial;
     else
     {
+        // Same memory limits as the app (shared settings). --force skips them.
+        if (!Flag("--force"))
+        {
+            var store = InstanceStore.Load();
+            var info = store.TryGetValue(avd, out var i) ? i : new InstanceInfo();
+            int ram = Option("--memory") is { } m && int.TryParse(m, out var mm) ? mm : MemoryGuard.DeviceRamMb(avd, info);
+            var others = running.Keys.Select(a => (a, store.TryGetValue(a, out var oi) ? oi : new InstanceInfo()));
+            var why = MemoryGuard.Check(avd, ram, others, AppState.Load().MemoryBudgetPercent, out var fits);
+            if (why != null)
+                throw new InvalidOperationException(why + (fits > 0 ? $"\nIt would fit with --memory {fits}." : "") + "\nUse --force to start it anyway.");
+        }
         var extra = cold ? "-no-snapshot-load" : "";
         if (Flag("--headless")) extra += " -no-window";
         if (Option("--memory") is { } mem && int.TryParse(mem, out var mb) && mb >= 1024) extra += $" -memory {mb}";
@@ -144,6 +156,31 @@ try
             AvdFactory.CreateFrom(template, name);
             if (Option("--project") is { } label) InstanceStore.SetProject(name, label);
             Console.WriteLine($"Created {name} (serial emulator-{InstanceStore.EnsurePort(name)})");
+            return 0;
+        }
+        case "mem":
+        {
+            var (total, available) = MemoryGuard.SystemMemory();
+            var pct = AppState.Load().MemoryBudgetPercent;
+            var store = InstanceStore.Load();
+            var running = await sdk.RunningAvds();
+            Console.WriteLine($"Windows:      {MemoryGuard.Gb(total - available)} of {MemoryGuard.Gb(total)} GB in use ({MemoryGuard.Gb(available)} GB free)");
+            Console.WriteLine($"Device limit: {(pct > 0 ? $"{pct}% = {MemoryGuard.Gb(MemoryGuard.BudgetMb(pct))} GB" : "none")}");
+            foreach (var avd in running.Keys)
+            {
+                var info = store.TryGetValue(avd, out var i) ? i : new InstanceInfo();
+                long actual = 0;
+                if (Sdk.QemuPid(avd) is { } pid) try { using var p = System.Diagnostics.Process.GetProcessById(pid); actual = p.PrivateMemorySize64 / 1048576; } catch { }
+                Console.WriteLine($"  {avd,-14} {MemoryGuard.Gb(MemoryGuard.DeviceRamMb(avd, info))} GB RAM setting, counts {MemoryGuard.Gb(MemoryGuard.EstimateMb(avd, info))} GB, using {MemoryGuard.Gb(actual)} GB now");
+            }
+            var daemons = MemoryGuard.BuildDaemons();
+            Console.WriteLine($"Build daemons: {daemons.Count} using {MemoryGuard.Gb(daemons.Sum(d => d.Mb))} GB" + (daemons.Count > 0 ? "  (celestium mem --free stops idle ones)" : ""));
+            if (await MemoryGuard.ComfyUiMb() is { } comfy) Console.WriteLine($"ComfyUI:      {MemoryGuard.Gb(comfy)} GB" + "  (celestium mem --free unloads its models)");
+            if (Flag("--free"))
+            {
+                Console.WriteLine($"Stopped {await MemoryGuard.StopIdleBuildDaemons()} idle build daemon(s).");
+                if (await MemoryGuard.ComfyUiMb() != null) Console.WriteLine(await MemoryGuard.UnloadComfyUiModels() ? "ComfyUI released its models." : "ComfyUI didn't respond.");
+            }
             return 0;
         }
         case "memory":

@@ -20,6 +20,7 @@ partial class MainForm
             foreach (var v in _views.Values.Where(v => v.Running).ToList()) await ToggleStart(v.Avd);
         }).Enabled = running > 0;
         m.Items.Add("Arrange device windows", null, (_, _) => ArrangeWindows()).Enabled = running > 0;
+        m.Items.Add("Free up memory…", null, async (_, _) => await ShowFreeMemory());
         m.Items.Add(new ToolStripSeparator());
         m.Items.Add("Settings…", null, (_, _) => ShowAppSettings());
         m.Items.Add("Help (F1)", null, (_, _) => HelpWindow.Open(this));
@@ -32,6 +33,51 @@ partial class MainForm
             "About", MessageBoxButtons.OK, MessageBoxIcon.Information));
         m.Closed += (_, _) => BeginInvoke(m.Dispose);
         m.Show(anchor, new Point(0, anchor.Height));
+    }
+
+    // ── Free up memory ──────────────────────────────────────────────────────
+
+    async Task ShowFreeMemory()
+    {
+        SetStatus("Measuring memory…");
+        var daemons = await Task.Run(MemoryGuard.BuildDaemons);
+        var comfy = await MemoryGuard.ComfyUiMb();
+        var (total, available) = MemoryGuard.SystemMemory();
+        var devices = _views.Values.Where(v => v.Running).ToList();
+        long deviceMb = 0;
+        foreach (var v in devices)
+            if (Sdk.QemuPid(v.Avd) is { } pid) try { using var p = Process.GetProcessById(pid); deviceMb += p.PrivateMemorySize64 / 1048576; } catch { }
+        long daemonMb = daemons.Sum(d => d.Mb);
+
+        using var f = DarkDialog("Free up memory", 520, 360);
+        int y = 20;
+        void Line(string text, string? sub = null)
+        {
+            f.Controls.Add(new Label { Text = text, Location = new Point(22, y), AutoSize = true, ForeColor = Ui.T.Text, Font = Theme.BodyBold });
+            if (sub != null) f.Controls.Add(new Label { Text = sub, Location = new Point(22, y + 22), AutoSize = true, MaximumSize = new Size(470, 0), ForeColor = Ui.T.SubText, Font = Theme.Small, Tag = "sub" });
+            y += sub != null ? 58 : 32;
+        }
+        Line($"Windows: {MemoryGuard.Gb(total - available)} of {MemoryGuard.Gb(total)} GB in use");
+        Line($"Celestium devices: {MemoryGuard.Gb(deviceMb)} GB ({devices.Count} running)", devices.Count > 0 ? string.Join(", ", devices.Select(d => d.Avd)) : "None running.");
+        Line($"Android build daemons: {MemoryGuard.Gb(daemonMb)} GB ({daemons.Count})", "Gradle/Kotlin servers left running after builds for up to 3 hours. Stopping idle ones is safe; the next build starts them again.");
+        if (comfy != null) Line($"ComfyUI: {MemoryGuard.Gb(comfy.Value)} GB", "Keeps AI models loaded after each job. Unloading is safe; they reload on the next job.");
+
+        var row = new FlowLayoutPanel { Location = new Point(18, f.ClientSize.Height - 60), Size = new Size(490, 46), BackColor = Color.Transparent };
+        f.Controls.Add(row);
+        var stopDaemons = new PillButton("Stop idle build daemons", PillStyle.Primary) { Margin = new Padding(0, 0, 8, 0), Enabled = daemons.Count > 0 };
+        stopDaemons.Click += async (_, _) => { stopDaemons.Enabled = false; var n = await MemoryGuard.StopIdleBuildDaemons(); SetStatus($"Stopped {n} idle build daemon(s)."); f.Close(); };
+        row.Controls.Add(stopDaemons);
+        if (comfy != null)
+        {
+            var unload = new PillButton("Unload AI models") { Margin = new Padding(0, 0, 8, 0) };
+            unload.Click += async (_, _) => { unload.Enabled = false; SetStatus(await MemoryGuard.UnloadComfyUiModels() ? "ComfyUI released its models." : "ComfyUI didn't respond."); f.Close(); };
+            row.Controls.Add(unload);
+        }
+        var stopAll = new PillButton("Stop all devices", PillStyle.Danger) { Enabled = devices.Count > 0 };
+        stopAll.Click += async (_, _) => { f.Close(); foreach (var v in devices) await ToggleStart(v.Avd); };
+        row.Controls.Add(stopAll);
+        SetStatus("");
+        f.ShowDialog(this);
     }
 
     // ── Window tools ────────────────────────────────────────────────────────
@@ -139,7 +185,7 @@ partial class MainForm
 
     void ShowAppSettings()
     {
-        using var f = DarkDialog("Celestium settings", 520, 590);
+        using var f = DarkDialog("Celestium settings", 520, 650);
         int y = 20;
         Control Row(string label, Control right, string? hint = null)
         {
@@ -162,6 +208,12 @@ partial class MainForm
         Row("Start hidden in the tray", hidden);
         var reopen = new Toggle(); reopen.SetQuiet(_state.RestoreInstances);
         Row("Reopen devices that were running", reopen, "After a reboot, devices you left running start again.");
+        var budget = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, Width = 170 };
+        var budgets = new[] { 25, 35, 50, 75, 0 };
+        long totalGb = MemoryGuard.SystemMemory().totalMb / 1024;
+        budget.Items.AddRange(budgets.Select(b => (object)(b == 0 ? "No limit" : $"{b}% ({totalGb * b / 100} GB)")).ToArray());
+        budget.SelectedIndex = Math.Max(0, Array.IndexOf(budgets, _state.MemoryBudgetPercent));
+        Row("Memory devices may use in total", budget, "Starting a device that would go over this is blocked.");
         var backs = new Toggle(); backs.SetQuiet(_state.PcBackButtons);
         Row("Right-click, Esc and mouse Back = Android Back", backs);
         var shortcuts = new Toggle(); shortcuts.SetQuiet(_state.ShortcutsToApps);
@@ -184,9 +236,9 @@ partial class MainForm
             Location = new Point(22, y + 6), AutoSize = true, ForeColor = Ui.T.SubText, Font = Theme.Small, Tag = "sub",
         });
 
-        var save = new PillButton("Save", PillStyle.Primary) { Location = new Point(390, 530), Width = 108 };
+        var save = new PillButton("Save", PillStyle.Primary) { Location = new Point(390, 590), Width = 108 };
         save.Click += (_, _) => { f.DialogResult = DialogResult.OK; f.Close(); };
-        var data = new PillButton("Open data folder") { Location = new Point(22, 530) };
+        var data = new PillButton("Open data folder") { Location = new Point(22, 590) };
         data.Click += (_, _) => Sdk.Launch("explorer.exe", $"\"{Paths.DataDir}\"");
         f.Controls.AddRange(new Control[] { save, data });
         if (f.ShowDialog(this) != DialogResult.OK) return;
@@ -195,6 +247,7 @@ partial class MainForm
         _state.StartHidden = hidden.On;
         _state.RestoreInstances = reopen.On;
         _state.PcBackButtons = backs.On;
+        _state.MemoryBudgetPercent = budgets[budget.SelectedIndex];
         _state.ShortcutsToApps = shortcuts.On;
         ApplyEmulatorKeyboardSetting();
         _state.MediaFolder = media.Text.Trim().Length > 0 && media.Text.Trim() != MediaFolder ? media.Text.Trim() : _state.MediaFolder;

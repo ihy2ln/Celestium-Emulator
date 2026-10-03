@@ -8,7 +8,7 @@ namespace DroidLauncher;
 static class AppInfo
 {
     /// <summary>The real app version. The exe's file version stays 1.0.0 so the exe never changes (see the csproj).</summary>
-    public const string Version = "1.6.2";
+    public const string Version = "1.6.3";
 }
 
 record Config(string SdkRoot)
@@ -78,6 +78,8 @@ class AppState
     public bool PcBackButtons { get; set; } = true;
     /// <summary>Ctrl shortcuts (copy/paste, word jumps…) go to Android apps instead of the emulator's own controls.</summary>
     public bool ShortcutsToApps { get; set; } = true;
+    /// <summary>All running devices together may use at most this share of physical RAM (0 = no limit).</summary>
+    public int MemoryBudgetPercent { get; set; } = 35;
 
     static string FilePath => Path.Combine(Paths.DataDir, "state.json");
     public static AppState Load() => Paths.ReadJson<AppState>(FilePath);
@@ -423,12 +425,13 @@ class Sdk(Config cfg)
     }
 
     /// <summary>Boots an AVD on its fixed port, with its memory and window settings, and returns its serial.</summary>
-    public string Start(string avd, string extraArgs)
+    public string Start(string avd, string extraArgs, int? ramOverrideMb = null)
     {
         var port = InstanceStore.EnsurePort(avd);
         var info = InstanceStore.Get(avd);
         var args = $"-avd {avd} -port {port} -no-boot-anim";
-        if (info.RamMb is > 0) args += $" -memory {info.RamMb}";
+        // Always pass an explicit RAM size, so a device can never use more than Celestium accounted for.
+        args += $" -memory {ramOverrideMb ?? MemoryGuard.DeviceRamMb(avd, info)}";
         if (info.Headless) args += " -no-window";
         if (info.Cores is > 0) args += $" -cores {info.Cores}";
         if (info.CameraBack is { Length: > 0 } back) args += $" -camera-back {back}";

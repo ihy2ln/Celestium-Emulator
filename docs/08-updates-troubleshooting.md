@@ -16,6 +16,10 @@ Celestium isn't code-signed, so antivirus that checks reputation may look at it 
 
 **Ctrl+C, Ctrl+V or Ctrl+arrow keys rotate the phone or do something else.** Turn on **⋯ › Settings › Ctrl shortcuts go to apps**, then restart the device so its window picks up the change.
 
+**"Not enough memory" when starting a device.** Your running devices plus this one would go over the device limit, or Windows is low on free RAM. Accept the smaller RAM size Celestium offers, stop another device, or open **⋯ › Free up memory**. Idle Android build daemons are often the biggest hidden user. The limit itself is in **⋯ › Settings**.
+
+**The PC is low on memory, but the devices look small.** Check **⋯ › Free up memory**. "OpenJDK Platform binary" in Task Manager is usually Gradle and Kotlin build daemons, not the emulator. The emulator is `qemu-system-x86_64`.
+
 **The screen preview is black.** The device is still booting, or its screen is off. Press **Power** on the Controls tab.
 
 **Game mode doesn't react to keys.** Click the phone screen once so game mode has keyboard focus. Controller input only works while the game is in front.

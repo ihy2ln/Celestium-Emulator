@@ -31,5 +31,6 @@
     <Compile Include="../Core.cs" Link="Core.cs" />
     <Compile Include="../Profiles.cs" Link="Profiles.cs" />
     <Compile Include="../EmulatorConsole.cs" Link="EmulatorConsole.cs" />
+    <Compile Include="../MemoryGuard.cs" Link="MemoryGuard.cs" />
   </ItemGroup>
 </Project>
